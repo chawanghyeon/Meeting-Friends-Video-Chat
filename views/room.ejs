@@ -13,11 +13,6 @@
   <script src="https://unpkg.com/vue-router/dist/vue-router.js"></script>
   <script>
     const ROOM_ID = "<%= roomId %>"
-    let vm = new Vue({
-      el: '#app',
-      data: { roomName: '', roomPassword: '', clients: 1 },
-
-    });
   </script>
   <title>room</title>
   <style>
@@ -80,7 +75,7 @@
   <div id="room_bg" class="modal_bg"></div>
   <div id="room_wrap" class="modal_wrap">
     <div id="room_close" class="modal_close"><a href="#">close</a></div>
-    <div id="app">
+    <div>
       <form action="/room/">
         이름<input type="text" v-model="roomName"> <br>
         비밀번호<input type="password" v-model="roomPassword"><br>
@@ -98,6 +93,8 @@
       <li>게임 2</li>
     </div>
   </div>
+  <textarea name="chat" id="chat" cols="30" rows="10"></textarea>
+  <div id="app"><input type="text" v-model="chatting"><button id="connect">연결</button><button id="send">전송</button></div>
   <button type='button' id="room_btn" class="btn btn-outline-dark">방설정</button>
   <button id="videoButton">Video</button>
   <button id="audioButton">Audio</button>

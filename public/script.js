@@ -102,6 +102,7 @@ socket.on('user-disconnected', (userId) => {
   if (peers[userId]) {
     peers[userId].close();
     delete peers[userId];
+    delete connections[userId];
   }
 });
 
@@ -120,6 +121,48 @@ function addVideoStream(video, stream) {
 
 myPeer.on('error', (e) => {
   alert(e);
+});
+
+//채팅창 기능
+let connections = {}
+
+let vm = new Vue({
+  el: '#app',
+  data: { roomName: '', roomPassword: '', clients: 1, chatting: '' },
+});
+
+//on event 등록했는지 체크해서 중복 등록 방지하기
+myPeer.on('connection', function(con){
+  for (const key in connections) {
+    if(typeof connections[con.peer] === 'undefined'){
+      connections[con.peer] = con
+      connections[con.peer].on('data', function(data){
+        console.log('reply')
+        console.log('Incoming data', data);
+        connections[con.peer].send('REPLY');
+      });
+    }
+  }
+});
+
+document.getElementById('connect').addEventListener('click', () => {
+  console.log('실행?');
+  for (const key in peers) {
+    if(typeof connections[key] === 'undefined'){
+      connections[key] = myPeer.connect(key);
+      connections[key].on('data', (data) => {
+        console.log('데이터 받음')
+        console.log(data)
+      });
+    }
+  }
+});
+
+document.getElementById('send').addEventListener('click', () => {
+  for (const key in connections) {
+    console.log('실행?', vm.$data.chatting)
+    connections[key].send(vm.$data.chatting);
+  }
 });
 
 //방설정 버튼
