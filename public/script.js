@@ -1,7 +1,7 @@
 const socket = io('/');
 const videoGrid = document.getElementById('video-grid');
-
 let myPeer;
+
 if (location.hostname === '192.168.35.115') {
 	myPeer = new Peer({
 		config: {
@@ -37,6 +37,7 @@ if (location.hostname === '192.168.35.115') {
 		debug: true,
 	});
 }
+
 const myVideo = document.createElement('video');
 myVideo.muted = true;
 myVideo.id = 'local';
@@ -109,7 +110,22 @@ socket.on('user-disconnected', userId => {
 
 myPeer.on('open', id => {
 	console.log(id, 'myid');
-	socket.emit('join-room', ROOM_ID, id);
+	socket.emit('check-password', ROOM_ID, id);
+	socket.on('set-password', password => {
+		vm.$data.password = true;
+		vm.$data.roomPassword = password;
+	});
+	if (vm.$data.password) {
+		let returnValue = prompt('비밀번호를 입력하세요');
+		if (returnValue === vm.$data.roomPassword) {
+			socket.emit('join-room', ROOM_ID, id);
+		} else {
+			// window.location.href='https://wattingroom';
+		}
+	} else {
+		socket.emit('join-room', ROOM_ID, id);
+		vm.$data.roomId = ROOM_ID;
+	}
 });
 
 function addVideoStream(video, stream) {
@@ -124,15 +140,33 @@ myPeer.on('error', e => {
 	alert(e);
 });
 
-//채팅창 기능
-let connections = {};
+//방이 꽉 찼을 때
+socket.on('full', room => {
+	alert('Room ' + room + ' is full');
+	// window.location.href='https://';
+});
+
+//vue 객체
 
 let vm = new Vue({
 	el: '#app',
-	data: { roomName: '', roomPassword: '', clients: 1, chatting: '' },
+	data: {
+		roomName: '',
+		roomPassword: '',
+		roomclients: 1,
+		chatting: '',
+		password: false,
+		roomId: '',
+	},
+	watch: {
+		roomPassword: function () {
+			socket.emit('password', this.roomPassword, this.roomId);
+		},
+	},
 });
 
 //채팅 기능
+let connections = {};
 const chat = document.getElementById('chat');
 myPeer.on('connection', function (con) {
 	console.log(con.peer);
@@ -161,6 +195,7 @@ document.getElementById('send').addEventListener('click', () => {
 	for (const key in connections) {
 		connections[key].send(vm.$data.chatting);
 	}
+	vm.$data.chatting = '';
 });
 
 //방설정 버튼
@@ -208,8 +243,9 @@ document
 	.getElementById('chat_close')
 	.addEventListener('click', offClickChatbtn);
 
+//비디오 오디오 온오프 기능
 let videoStatus = true;
-//local과 remote가 서로 달라서 안되는 현상
+
 video_btn.onclick = () => {
 	if (videoStatus) {
 		document

@@ -74,11 +74,11 @@
 		<div id="room_bg" class="black_bg"></div>
 		<div id="room_wrap" class="modal_wrap">
 			<div id="room_close" class="modal_close"><a href="#">close</a></div>
-			<div>
+			<div id="app">
 				<form action="/room/">
-					이름<input type="text" v-model="roomName" /> <br />
-					비밀번호<input type="password" v-model="roomPassword" /><br />
-					방 인원<input type="number" v-model="clients" /><br />
+					이름<input type="text" v-model.lazy="roomName" /> <br />
+					비밀번호<input type="password" v-model.lazy="roomPassword" /><br />
+					방 인원<input type="number" v-model.lazy="roomclients" /><br />
 					<button type="reset">취소</button><br />
 					<button type="submit">적용</button><br />
 				</form>
@@ -106,7 +106,7 @@
 		</button>
 		<button id="video_btn">Video</button>
 		<button id="audio_btn">Audio</button>
-    <button id="chat_btn">Chat</button>
+		<button id="chat_btn">Chat</button>
 		<button type="button" id="game_btn" class="btn btn-outline-dark" onclick="">
 			술게임
 		</button>
