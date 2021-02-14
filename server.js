@@ -31,13 +31,16 @@ let counts = {};
 //비밀번호 기능과 방 인원 기능은 server.js에서 구현해야 함
 io.on('connection', socket => {
 	socket.on('check-room', roomId => {
+		if (!counts[roomId]) {
+			counts[roomId] = 6;
+		}
 		socket.emit(
 			'set-room',
-			(passwords[roomId],
-			titles[roomId],
+			passwords[roomId],
 			counts[roomId],
-			io.sockets.adapter.rooms[roomId])
+			io.sockets.adapter.rooms[roomId]
 		);
+		socket.emit('set-title', titles[roomId]);
 	});
 	socket.on('join-room', (roomId, userId) => {
 		let clientsInRoom = io.sockets.adapter.rooms[roomId];
@@ -48,14 +51,9 @@ io.on('connection', socket => {
 		if (numClients === 0) {
 			powers[roomId] = userId;
 			socket.emit('set-power');
-			socket.join(roomId);
-			socket.to(roomId).broadcast.emit('user-connected', userId);
-		} else if (numClients < 2) {
-			socket.join(roomId);
-			socket.to(roomId).broadcast.emit('user-connected', userId);
-		} else {
-			socket.to(roomId).broadcast.emit('full', roomId);
 		}
+		socket.join(roomId);
+		socket.to(roomId).broadcast.emit('user-connected', userId);
 		socket.on('disconnect', () => {
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
 			if (io.engine.clientsCount === 0) {

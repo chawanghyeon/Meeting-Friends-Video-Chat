@@ -72,13 +72,13 @@ getUserMedia({ video: true, audio: true }, stream => {
 			video.remove();
 		});
 		peers[newUserId] = call;
-		vm.$data.roomclients++;
+		vm.$data.count++;
 	});
 });
 
 myPeer.on('call', call => {
 	peers[call.peer] = call;
-	vm.$data.roomclients++;
+	vm.$data.count++;
 	getUserMedia({ video: true, audio: true }, function (stream) {
 		if (typeof localStream == 'undefined') {
 			console.log('!');
@@ -107,15 +107,16 @@ socket.on('user-disconnected', userId => {
 		peers[userId].close();
 		delete peers[userId];
 		delete connections[userId];
-		vm.$data.roomclients--;
+		vm.$data.count--;
 	}
 });
-
+let p;
 myPeer.on('open', id => {
 	//방인원 설정
 	console.log(id, 'myid');
 	socket.emit('check-room', ROOM_ID);
-	socket.on('set-room', (password, title, count, clients) => {
+	socket.on('set-room', (password, count, clients) => {
+		console.log(clients, count, 'c');
 		if (password) {
 			vm.$data.passwordStatus = true;
 			vm.$data.roomPassword = password;
@@ -123,7 +124,15 @@ myPeer.on('open', id => {
 		if (vm.$data.passwordStatus) {
 			let returnValue = prompt('비밀번호를 입력하세요');
 			if (returnValue === vm.$data.roomPassword) {
-				if (count < clients) {
+				if (clients) {
+					console.log('is password and clients');
+					if (clients.length < count) {
+						socket.emit('join-room', ROOM_ID, id);
+					} else {
+						alert('Room ' + ROOM_ID + ' is full');
+						// window.location.href='https://wattingroom';
+					}
+				} else {
 					socket.emit('join-room', ROOM_ID, id);
 				}
 			} else {
@@ -131,14 +140,27 @@ myPeer.on('open', id => {
 				// window.location.href='https://wattingroom';
 			}
 		} else {
-			socket.emit('join-room', ROOM_ID, id);
-			vm.$data.roomId = ROOM_ID;
+			if (clients) {
+				console.log('no password is clients');
+				if (clients.length < count) {
+					socket.emit('join-room', ROOM_ID, id);
+				} else {
+					alert('Room ' + ROOM_ID + ' is full');
+					// window.location.href='https://wattingroom';
+				}
+			} else {
+				socket.emit('join-room', ROOM_ID, id);
+			}
 		}
+		vm.$data.roomId = ROOM_ID;
+	});
+	socket.on('set-title', title => {
 		if (title) {
 			vm.$data.title = title;
 			document.title = title;
 		}
 	});
+
 	vm.$data.userId = id;
 });
 
@@ -172,12 +194,6 @@ myPeer.on('error', e => {
 	alert(e);
 });
 
-//방이 꽉 찼을 때
-socket.on('full', room => {
-	alert('Room ' + room + ' is full');
-	// window.location.href='https://';
-});
-
 //vue 객체
 
 let vm = new Vue({
@@ -185,11 +201,12 @@ let vm = new Vue({
 	data: {
 		title: '',
 		roomPassword: '',
-		roomclients: 6,
+		roomClientsLimit: 6,
 		chatting: '',
 		passwordStatus: false,
 		userId: '',
 		power: false,
+		count: 1,
 	},
 	watch: {
 		roomPassword: function () {
@@ -207,6 +224,11 @@ let vm = new Vue({
 		power: function () {
 			if (!this.power) {
 				socket.emit('power', ROOM_ID);
+			}
+		},
+		roomClientsLimit: function () {
+			if (this.roomClientsLimit > this.count || this.roomClientsLimit < 7) {
+				socket.emit('count', this.roomClientsLimit, ROOM_ID);
 			}
 		},
 	},
