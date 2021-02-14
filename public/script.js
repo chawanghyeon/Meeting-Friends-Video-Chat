@@ -72,11 +72,13 @@ getUserMedia({ video: true, audio: true }, stream => {
 			video.remove();
 		});
 		peers[newUserId] = call;
+		vm.$data.roomclients++;
 	});
 });
 
 myPeer.on('call', call => {
 	peers[call.peer] = call;
+	vm.$data.roomclients++;
 	getUserMedia({ video: true, audio: true }, function (stream) {
 		if (typeof localStream == 'undefined') {
 			console.log('!');
@@ -105,27 +107,43 @@ socket.on('user-disconnected', userId => {
 		peers[userId].close();
 		delete peers[userId];
 		delete connections[userId];
+		vm.$data.roomclients--;
 	}
 });
 
 myPeer.on('open', id => {
+	//방인원 설정
 	console.log(id, 'myid');
-	socket.emit('check-password', ROOM_ID, id);
-	socket.on('set-password', password => {
-		vm.$data.password = true;
-		vm.$data.roomPassword = password;
-	});
-	if (vm.$data.password) {
-		let returnValue = prompt('비밀번호를 입력하세요');
-		if (returnValue === vm.$data.roomPassword) {
-			socket.emit('join-room', ROOM_ID, id);
-		} else {
-			// window.location.href='https://wattingroom';
+	socket.emit('check-room', ROOM_ID);
+	socket.on('set-room', (password, title, count, clients) => {
+		if (password) {
+			vm.$data.passwordStatus = true;
+			vm.$data.roomPassword = password;
 		}
-	} else {
-		socket.emit('join-room', ROOM_ID, id);
-		vm.$data.roomId = ROOM_ID;
-	}
+		if (vm.$data.passwordStatus) {
+			let returnValue = prompt('비밀번호를 입력하세요');
+			if (returnValue === vm.$data.roomPassword) {
+				if (count < clients) {
+					socket.emit('join-room', ROOM_ID, id);
+				}
+			} else {
+				alert('비밀번호가 틀렸습니다.');
+				// window.location.href='https://wattingroom';
+			}
+		} else {
+			socket.emit('join-room', ROOM_ID, id);
+			vm.$data.roomId = ROOM_ID;
+		}
+		if (title) {
+			vm.$data.title = title;
+			document.title = title;
+		}
+	});
+	vm.$data.userId = id;
+});
+
+socket.on('set-power', () => {
+	vm.$data.power = true;
 });
 
 function addVideoStream(video, stream) {
@@ -133,7 +151,21 @@ function addVideoStream(video, stream) {
 	video.addEventListener('loadedmetadata', () => {
 		video.play();
 	});
-	videoGrid.append(video);
+	const div = document.createElement('div');
+	if (video.id !== 'local') {
+		const btn = document.createElement('button');
+		div.id = 'divclick';
+		btn.id = 'click';
+		btn.innerHTML = 'click';
+		btn.onclick = () => {
+			alert(1);
+		};
+		div.append(video);
+		div.append(btn);
+	} else {
+		div.append(video);
+	}
+	videoGrid.append(div);
 }
 
 myPeer.on('error', e => {
@@ -151,16 +183,31 @@ socket.on('full', room => {
 let vm = new Vue({
 	el: '#app',
 	data: {
-		roomName: '',
+		title: '',
 		roomPassword: '',
-		roomclients: 1,
+		roomclients: 6,
 		chatting: '',
-		password: false,
-		roomId: '',
+		passwordStatus: false,
+		userId: '',
+		power: false,
 	},
 	watch: {
 		roomPassword: function () {
-			socket.emit('password', this.roomPassword, this.roomId);
+			socket.emit('password', this.roomPassword, ROOM_ID);
+			if (this.roomPassword.length > 0) {
+				this.passwordStatus = true;
+			} else {
+				this.passwordStatus = false;
+			}
+		},
+		title: function () {
+			socket.emit('title', this.title, ROOM_ID);
+			document.title = this.title;
+		},
+		power: function () {
+			if (!this.power) {
+				socket.emit('power', ROOM_ID);
+			}
 		},
 	},
 });
@@ -169,7 +216,6 @@ let vm = new Vue({
 let connections = {};
 const chat = document.getElementById('chat');
 myPeer.on('connection', function (con) {
-	console.log(con.peer);
 	connections[con.peer] = con;
 	con.on('data', function (data) {
 		chat.innerHTML += data + `\n`;
@@ -180,7 +226,6 @@ myPeer.on('connection', function (con) {
 document.getElementById('chat_btn').addEventListener('click', () => {
 	for (const key in peers) {
 		if (typeof connections[key] === 'undefined') {
-			console.log('실행?');
 			connections[key] = myPeer.connect(key);
 			connections[key].on('data', data => {
 				chat.innerHTML += data + `\n`;
@@ -192,6 +237,7 @@ document.getElementById('chat_btn').addEventListener('click', () => {
 
 document.getElementById('send').addEventListener('click', () => {
 	chat.innerHTML += vm.$data.chatting + `\n`;
+	console.log(vm.$data.chatting);
 	for (const key in connections) {
 		connections[key].send(vm.$data.chatting);
 	}
@@ -208,7 +254,6 @@ function offClickRoombtn() {
 	document.getElementById('room_bg').style.display = 'none';
 }
 
-document.getElementById('room_btn').addEventListener('click', onClickRoombtn);
 document
 	.getElementById('room_close')
 	.addEventListener('click', offClickRoombtn);

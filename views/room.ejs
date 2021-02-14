@@ -66,50 +66,69 @@
 				background: url(https://img.icons8.com/metro/26/000000/close-window.png);
 				text-indent: -9999px;
 			}
+
+			#click {
+				position: relative;
+				top: -300px;
+				right: -250px;
+			}
 		</style>
 	</head>
 
 	<body>
 		<div id="video-grid"></div>
-		<div id="room_bg" class="black_bg"></div>
-		<div id="room_wrap" class="modal_wrap">
-			<div id="room_close" class="modal_close"><a href="#">close</a></div>
-			<div id="app">
-				<form action="/room/">
-					이름<input type="text" v-model.lazy="roomName" /> <br />
-					비밀번호<input type="password" v-model.lazy="roomPassword" /><br />
-					방 인원<input type="number" v-model.lazy="roomclients" /><br />
-					<button type="reset">취소</button><br />
-					<button type="submit">적용</button><br />
-				</form>
+		<div id="app">
+			<div id="room_bg" class="black_bg"></div>
+			<div id="room_wrap" class="modal_wrap">
+				<div id="room_close" class="modal_close"><a href="#">close</a></div>
+				<div>
+					<form action="/room/">
+						이름<input type="text" v-model.lazy="title" /> <br />
+						비밀번호<input type="password" v-model.lazy="roomPassword" /><br />
+						방 인원<input type="number" v-model.lazy="roomclients" /><br />
+						<button type="reset">취소</button><br />
+						<button type="submit">적용</button><br />
+					</form>
+				</div>
 			</div>
-		</div>
-		<div id="game_bg" class="black_bg"></div>
-		<div id="game_wrap" class="modal_wrap">
-			<div id="game_close" class="modal_close"><a href="#">close</a></div>
-			<div>
-				<li>게임 1</li>
-				<li>게임 2</li>
+			<div id="game_bg" class="black_bg"></div>
+			<div id="game_wrap" class="modal_wrap">
+				<div id="game_close" class="modal_close"><a href="#">close</a></div>
+				<div>
+					<li>게임 1</li>
+					<li>게임 2</li>
+				</div>
 			</div>
-		</div>
-		<div id="chat_bg" class="black_bg"></div>
-		<div id="chat_wrap" class="modal_wrap">
-			<div id="chat_close" class="modal_close"><a href="#">close</a></div>
-			<textarea name="chat" id="chat" cols="30" rows="10" disabled></textarea>
-			<div id="app">
-				<input type="text" v-model="chatting" />
-				<button id="send">전송</button>
+			<div id="chat_bg" class="black_bg"></div>
+			<div id="chat_wrap" class="modal_wrap">
+				<div id="chat_close" class="modal_close"><a href="#">close</a></div>
+				<textarea name="chat" id="chat" cols="30" rows="10" disabled></textarea>
+				<div>
+					<input type="text" v-model="chatting" />
+					<button id="send">전송</button>
+				</div>
 			</div>
+			<button
+				type="button"
+				id="room_btn"
+				class="btn btn-outline-dark"
+				v-if="power"
+				onclick="onClickRoombtn()"
+			>
+				방설정
+			</button>
+			<button id="video_btn">Video</button>
+			<button id="audio_btn">Audio</button>
+			<button id="chat_btn">Chat</button>
+			<button
+				type="button"
+				id="game_btn"
+				class="btn btn-outline-dark"
+				onclick=""
+			>
+				술게임
+			</button>
+			<a href="/room/exit/ROOM_ID"><button>Exit</button></a>
 		</div>
-		<button type="button" id="room_btn" class="btn btn-outline-dark">
-			방설정
-		</button>
-		<button id="video_btn">Video</button>
-		<button id="audio_btn">Audio</button>
-		<button id="chat_btn">Chat</button>
-		<button type="button" id="game_btn" class="btn btn-outline-dark" onclick="">
-			술게임
-		</button>
-		<a href="/room/exit/{{ ROOM_ID }}"><button>Exit</button></a>
 	</body>
 </html>

@@ -25,33 +25,56 @@ server = https.createServer(
 );
 const io = require('socket.io')(server);
 let passwords = {};
+let titles = {};
+let powers = {};
+let counts = {};
 //비밀번호 기능과 방 인원 기능은 server.js에서 구현해야 함
 io.on('connection', socket => {
-	socket.on('check-password', (roomId, userId) => {
-    
-  });
+	socket.on('check-room', roomId => {
+		socket.emit(
+			'set-room',
+			(passwords[roomId],
+			titles[roomId],
+			counts[roomId],
+			io.sockets.adapter.rooms[roomId])
+		);
+	});
 	socket.on('join-room', (roomId, userId) => {
 		let clientsInRoom = io.sockets.adapter.rooms[roomId];
 		let numClients = clientsInRoom
 			? Object.keys(clientsInRoom.sockets).length
 			: 0;
 
-		//passwords에서 roomid로 찾았는데 있거나 없으면 ....
-		if (passwords[roomId] || passwords[roomId].length > 0) {
-			socket.to(roomId).broadcast.emit('set-password', passwords[roomId]);
-		}
-		if (numClients === 0 || numClients <= 2) {
+		if (numClients === 0) {
+			powers[roomId] = userId;
+			socket.emit('set-power');
+			socket.join(roomId);
+			socket.to(roomId).broadcast.emit('user-connected', userId);
+		} else if (numClients < 2) {
 			socket.join(roomId);
 			socket.to(roomId).broadcast.emit('user-connected', userId);
 		} else {
-			socket.emit('full', roomId);
+			socket.to(roomId).broadcast.emit('full', roomId);
 		}
 		socket.on('disconnect', () => {
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
+			if (io.engine.clientsCount === 0) {
+				delete passwords[roomId];
+			}
 		});
 	});
 	socket.on('password', (password, roomId) => {
 		passwords[roomId] = password;
+	});
+	socket.on('title', (title, roomId) => {
+		titles[roomId] = title;
+		socket.to(roomId).broadcast.emit('set-title', titles[roomId]);
+	});
+	socket.on('power', (power, roomId) => {
+		powers[roomId] = power;
+	});
+	socket.on('count', (count, roomId) => {
+		counts[roomId] = count;
 	});
 });
 
