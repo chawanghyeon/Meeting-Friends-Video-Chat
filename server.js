@@ -2,16 +2,13 @@ const fs = require('fs');
 const express = require('express');
 const app = express();
 const https = require('https');
-
 const { v4: uuidV4 } = require('uuid');
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
-
 app.get('/', (req, res) => {
 	res.redirect(`/${uuidV4()}`);
 });
-
 app.get('/:room', (req, res) => {
 	res.render('room', { roomId: req.params.room });
 });
@@ -24,55 +21,76 @@ server = https.createServer(
 	app
 );
 const io = require('socket.io')(server);
-let passwords = {};
-let titles = {};
-let powers = {};
-let counts = {};
-//비밀번호 기능과 방 인원 기능은 server.js에서 구현해야 함
+
+//서버운영중 필요한 데이터들
+const passwordList = {};
+const titleList = {};
+const powerList = {};
+const headcountLimitList = {};
+
 io.on('connection', socket => {
+	//클라이언트가 맨처음 로딩 시 방에 대해서 체크
 	socket.on('check-room', roomId => {
-		if (!counts[roomId]) {
-			counts[roomId] = 6;
+		if (!headcountLimitList[roomId]) {
+			headcountLimitList[roomId] = 6;
 		}
 		socket.emit(
 			'set-room',
-			passwords[roomId],
-			counts[roomId],
+			passwordList[roomId],
+			headcountLimitList[roomId],
 			io.sockets.adapter.rooms[roomId]
 		);
-		socket.emit('set-title', titles[roomId]);
+		socket.emit('set-title', titleList[roomId]);
+		socket.emit('set-power', powerList[roomId]);
 	});
+
 	socket.on('join-room', (roomId, userId) => {
 		let clientsInRoom = io.sockets.adapter.rooms[roomId];
 		let numClients = clientsInRoom
 			? Object.keys(clientsInRoom.sockets).length
 			: 0;
 
+		//방에 처음 들어가는거면 방장 권한 줌
 		if (numClients === 0) {
-			powers[roomId] = userId;
-			socket.emit('set-power');
+			powerList[roomId] = userId;
+			socket.emit('set-power', powerList[roomId]);
 		}
+
 		socket.join(roomId);
 		socket.to(roomId).broadcast.emit('user-connected', userId);
+
+		//연결이 끊어졌을 때
 		socket.on('disconnect', () => {
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
 			if (io.engine.clientsCount === 0) {
-				delete passwords[roomId];
+				delete passwordList[roomId];
 			}
 		});
 	});
-	socket.on('password', (password, roomId) => {
-		passwords[roomId] = password;
+
+	//사용자가 서버에 보내는 방 설정
+	socket.on('password', (roomId, password) => {
+		passwordList[roomId] = password;
 	});
-	socket.on('title', (title, roomId) => {
-		titles[roomId] = title;
-		socket.to(roomId).broadcast.emit('set-title', titles[roomId]);
+
+	socket.on('title', (roomId, title) => {
+		titleList[roomId] = title;
+		socket.to(roomId).broadcast.emit('set-title', titleList[roomId]);
 	});
-	socket.on('power', (power, roomId) => {
-		powers[roomId] = power;
+
+	socket.on('headcount', (roomId, headcount) => {
+		headcountLimitList[roomId] = headcount;
 	});
-	socket.on('count', (count, roomId) => {
-		counts[roomId] = count;
+
+	socket.on('power', (roomId, power) => {
+		powerList[roomId] = power;
+		socket.to(roomId).broadcast.emit('set-power', powerList[roomId]);
+		socket.emit('set-power', powerList[roomId]);
+	});
+
+	//강퇴
+	socket.on('retire', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('retire-user', userId);
 	});
 });
 

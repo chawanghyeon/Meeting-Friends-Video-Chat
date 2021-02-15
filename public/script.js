@@ -1,7 +1,21 @@
 const socket = io('/');
 const videoGrid = document.getElementById('video-grid');
+const myVideo = document.createElement('video');
+const connections = {};
+const callList = {};
+const peerList = {};
+let localStream;
 let myPeer;
+let videoStatus = true;
+let audioStatus = true;
+myVideo.muted = true;
+myVideo.id = 'local';
+let getUserMedia =
+	navigator.getUserMedia ||
+	navigator.webkitGetUserMedia ||
+	navigator.mozGetUserMedia;
 
+//배포할 때 192.168.35.115주소인 경우는 삭제
 if (location.hostname === '192.168.35.115') {
 	myPeer = new Peer({
 		config: {
@@ -37,313 +51,389 @@ if (location.hostname === '192.168.35.115') {
 		debug: true,
 	});
 }
-
-const myVideo = document.createElement('video');
-myVideo.muted = true;
-myVideo.id = 'local';
-let peers = {};
-const callList = [];
-let localStream;
-let getUserMedia =
-	navigator.getUserMedia ||
-	navigator.webkitGetUserMedia ||
-	navigator.mozGetUserMedia;
-
-getUserMedia({ video: true, audio: true }, stream => {
-	if (typeof localStream == 'undefined') {
-		console.log('!');
-		localStream = stream;
-	}
-	addVideoStream(myVideo, localStream);
-	socket.on('user-connected', newUserId => {
-		const call = myPeer.call(newUserId, localStream);
-		console.log(call);
-		const video = document.createElement('video');
-		video.id = 'remote';
-		call.on('stream', userVideoStream => {
-			// call의 remotestreamdl user
-			if (!callList[call.peer]) {
-				console.log(userVideoStream, 'connect');
-				addVideoStream(video, userVideoStream);
-				callList[call.peer] = call;
+let d;
+//vue 객체
+const vm = new Vue({
+	el: '#app',
+	data: {
+		headcount: 1,
+		power: false,
+		title: '',
+		userId: '',
+		chatting: '',
+		roomPassword: '',
+		headcountLimit: 6,
+		roomInfo: {},
+		userInfo: {},
+	},
+	methods: {
+		setRoom: function (data) {
+			this.title = data.title.value;
+			this.roomPassword = data.password.value;
+			this.headcountLimit = data.limit.value;
+			alert('적용완료');
+		},
+	},
+	watch: {
+		roomPassword: function () {
+			socket.emit('password', ROOM_ID, this.roomPassword);
+		},
+		title: function () {
+			socket.emit('title', ROOM_ID, this.title);
+			document.title = this.title;
+		},
+		headcountLimit: function () {
+			if (this.headcountLimit > this.headcount && this.headcountLimit < 7) {
+				socket.emit('headcount', ROOM_ID, this.headcountLimit);
+				console.log('emit');
+			} else {
+				this.headcountLimit = this.headcount;
 			}
-		});
-		call.on('close', () => {
-			video.remove();
-		});
-		peers[newUserId] = call;
-		vm.$data.count++;
-	});
-});
-
-myPeer.on('call', call => {
-	peers[call.peer] = call;
-	vm.$data.count++;
-	getUserMedia({ video: true, audio: true }, function (stream) {
-		if (typeof localStream == 'undefined') {
-			console.log('!');
-			localStream = stream;
-		}
-		console.log(localStream, 'call');
-		call.answer(localStream);
-		const video = document.createElement('video');
-		video.id = 'remote';
-		call.on('stream', userVideoStream => {
-			if (!callList[call.peer]) {
-				console.log(userVideoStream, 'uservideo');
-				addVideoStream(video, userVideoStream);
-				callList[call.peer] = call;
+			if (this.headcountLimit === '') {
+				this.headcountLimit = 0;
 			}
-		});
-		call.on('close', () => {
-			video.remove();
-		});
-	});
+			this.headcountLimit = Number(this.headcountLimit);
+		},
+		power: function () {
+			if (vm.$data.power) {
+				let temp = document.getElementsByClassName('click');
+				for (let index = 0; index < temp.length; index++) {
+					temp[index].style.display = 'inline-block';
+				}
+			} else {
+				let temp = document.getElementsByClassName('click');
+				for (let index = 0; index < temp.length; index++) {
+					temp[index].style.display = 'none';
+				}
+			}
+		},
+	},
 });
-//연결을 요청하는 곳에서 받는 call
 
-socket.on('user-disconnected', userId => {
-	if (peers[userId]) {
-		peers[userId].close();
-		delete peers[userId];
-		delete connections[userId];
-		vm.$data.count--;
-	}
-});
-let p;
+//peer가 생성되었을 때 실행
 myPeer.on('open', id => {
-	//방인원 설정
 	console.log(id, 'myid');
 	socket.emit('check-room', ROOM_ID);
-	socket.on('set-room', (password, count, clients) => {
-		console.log(clients, count, 'c');
-		if (password) {
-			vm.$data.passwordStatus = true;
-			vm.$data.roomPassword = password;
-		}
-		if (vm.$data.passwordStatus) {
-			let returnValue = prompt('비밀번호를 입력하세요');
-			if (returnValue === vm.$data.roomPassword) {
-				if (clients) {
-					console.log('is password and clients');
-					if (clients.length < count) {
-						socket.emit('join-room', ROOM_ID, id);
-					} else {
-						alert('Room ' + ROOM_ID + ' is full');
-						// window.location.href='https://wattingroom';
-					}
-				} else {
-					socket.emit('join-room', ROOM_ID, id);
-				}
-			} else {
-				alert('비밀번호가 틀렸습니다.');
-				// window.location.href='https://wattingroom';
-			}
-		} else {
-			if (clients) {
-				console.log('no password is clients');
-				if (clients.length < count) {
-					socket.emit('join-room', ROOM_ID, id);
-				} else {
-					alert('Room ' + ROOM_ID + ' is full');
-					// window.location.href='https://wattingroom';
-				}
-			} else {
-				socket.emit('join-room', ROOM_ID, id);
-			}
-		}
-		vm.$data.roomId = ROOM_ID;
-	});
-	socket.on('set-title', title => {
-		if (title) {
-			vm.$data.title = title;
-			document.title = title;
-		}
-	});
-
+	vm.$data.roomId = ROOM_ID;
 	vm.$data.userId = id;
 });
 
-socket.on('set-power', () => {
-	vm.$data.power = true;
+//연결을 요청하는 곳에서 받는 call
+myPeer.on('call', call => {
+	getUserMedia({ video: true, audio: true }, function (stream) {
+		if (typeof localStream === 'undefined') {
+			localStream = stream;
+		}
+		call.answer(localStream);
+		setCall(call, call.peer);
+	});
 });
 
-function addVideoStream(video, stream) {
+myPeer.on('error', e => {
+	alert(e);
+});
+
+socket.on('set-title', title => {
+	if (title) {
+		vm.$data.title = title;
+		document.title = title;
+	}
+});
+
+socket.on('set-power', power => {
+	console.log(power, 'power');
+	if (vm.$data.userId === power) {
+		vm.$data.power = true;
+	} else {
+		vm.$data.power = false;
+	}
+});
+
+socket.on('retire-user', userId => {
+	if (userId === vm.$data.userId) {
+		window.location.href = 'https://naver.com';
+	}
+});
+
+socket.on('user-disconnected', userId => {
+	if (peerList[userId]) {
+		peerList[userId].close();
+		delete peerList[userId];
+		delete connections[userId];
+		vm.$data.headcount--;
+		socket.emit('power', ROOM_ID, vm.$data.userId);
+	}
+});
+
+socket.on('user-connected', newUserId => {
+	const call = myPeer.call(newUserId, localStream);
+	setCall(call, newUserId);
+});
+
+socket.on('set-room', (password, headcountLimit, clients) => {
+	if (password) {
+		//비밀번호가 있는 경우
+		let returnValue = prompt('비밀번호를 입력하세요');
+		if (returnValue === password) {
+			//비밀번호가 맞은 경우
+			if (clients) {
+				//방인원제한이 있는 경우
+				if (clients.length < headcountLimit) {
+					console.log(clients.length, headcountLimit);
+					socket.emit('join-room', ROOM_ID, vm.$data.userId);
+				} else {
+					alert('Room ' + ROOM_ID + ' is full');
+					window.location.href = 'https://naver.com';
+				}
+			} else {
+				//방인원제한이 없는 경우
+				socket.emit('join-room', ROOM_ID, vm.$data.userId);
+			}
+		} else {
+			//비밀번호가 틀린 경우
+			alert('비밀번호가 틀렸습니다.');
+			window.location.href = 'https://naver.com';
+		}
+	} else {
+		//비밀번호가 없는 경우
+		if (clients) {
+			if (clients.length < headcountLimit) {
+				socket.emit('join-room', ROOM_ID, vm.$data.userId);
+			} else {
+				alert('Room ' + ROOM_ID + ' is full');
+				window.location.href = 'https://naver.com';
+			}
+		} else {
+			socket.emit('join-room', ROOM_ID, vm.$data.userId);
+		}
+	}
+});
+
+getUserMedia({ video: true, audio: true }, stream => {
+	if (typeof localStream === 'undefined') {
+		localStream = stream;
+	}
+	addVideoStream(myVideo, localStream);
+});
+
+function setCall(call, userId) {
+	const video = document.createElement('video');
+	let div;
+
+	call.on('stream', userVideoStream => {
+		if (!callList[call.peer]) {
+			div = addVideoStream(video, userVideoStream, userId);
+			callList[call.peer] = call;
+			peerList[call.peer] = call;
+			vm.$data.headcount++;
+		}
+	});
+
+	call.on('close', () => {
+		div.remove();
+	});
+}
+
+//스프링과 통신 방법 고민
+function getUserInfo() {
+	axios
+		.post('http://localhost:80', {
+			params: {
+				report: returnValue,
+			},
+		})
+		.then(message => {
+			alert(1);
+			alert(message);
+		})
+		.catch(() => {
+			alert('사용자 정보를 가져오는 중 문제가 발생했습니다.');
+		});
+}
+function getRoomInfo() {
+	axios
+		.post('http://localhost:80', {
+			params: {
+				report: returnValue,
+			},
+		})
+		.then(message => {
+			alert(1);
+			alert(message);
+		})
+		.catch(() => {
+			alert('방 정보를 가져오는 중 문제가 발생했습니다.');
+		});
+}
+
+function addVideoStream(video, stream, userId) {
 	video.srcObject = stream;
 	video.addEventListener('loadedmetadata', () => {
 		video.play();
 	});
 	const div = document.createElement('div');
 	if (video.id !== 'local') {
-		const btn = document.createElement('button');
-		div.id = 'divclick';
-		btn.id = 'click';
-		btn.innerHTML = 'click';
-		btn.onclick = () => {
-			alert(1);
+		const powerBtn = document.createElement('button');
+		const reportBtn = document.createElement('button');
+		const retireBtn = document.createElement('button');
+
+		reportBtn.id = 'click';
+		powerBtn.className = 'click';
+		retireBtn.className = 'click';
+
+		powerBtn.innerHTML = '방장';
+		reportBtn.innerHTML = '신고';
+		retireBtn.innerHTML = '강퇴';
+
+		//각 버튼의 기능
+		powerBtn.onclick = () => {
+			let returnValue = confirm('방장권한을 넘기시겠습니까?');
+			if (returnValue) {
+				socket.emit('power', ROOM_ID, userId);
+				vm.$data.power = false;
+			}
 		};
+		reportBtn.onclick = () => {
+			let returnValue = confirm('신고하시겠습니까?');
+			if (returnValue) {
+				returnValue = prompt('신고할 내용을 입력하세요.');
+				axios
+					.post('http://localhost:80', {
+						params: {
+							report: returnValue,
+						},
+					})
+					.then(message => {
+						alert(1);
+						alert(message);
+					})
+					.catch(() => {
+						alert('신고 제출중 문제가 발생했습니다.');
+					});
+			}
+		};
+		retireBtn.onclick = () => {
+			let returnValue = confirm('강퇴하시겠습니까?');
+			if (returnValue) {
+				socket.emit('retire', ROOM_ID, userId);
+				vm.$data.power = false;
+			}
+		};
+
+		//방장인 경우만 버튼 표시
+		if (!vm.$data.power) {
+			powerBtn.style.display = 'none';
+			retireBtn.style.display = 'none';
+		}
+
 		div.append(video);
-		div.append(btn);
+		div.append(reportBtn);
+		div.append(powerBtn);
+		div.append(retireBtn);
 	} else {
 		div.append(video);
 	}
+
 	videoGrid.append(div);
+	return div;
 }
 
-myPeer.on('error', e => {
-	alert(e);
-});
+//방설정 버튼
+room_close.onclick = () => {
+	document.getElementById('room_wrap').style.display = 'none';
+	document.getElementById('room_bg').style.display = 'none';
+};
 
-//vue 객체
+room_btn.onclick = () => {
+	document.getElementById('room_wrap').style.display = 'block';
+	document.getElementById('room_bg').style.display = 'block';
+};
 
-let vm = new Vue({
-	el: '#app',
-	data: {
-		title: '',
-		roomPassword: '',
-		roomClientsLimit: 6,
-		chatting: '',
-		passwordStatus: false,
-		userId: '',
-		power: false,
-		count: 1,
-	},
-	watch: {
-		roomPassword: function () {
-			socket.emit('password', this.roomPassword, ROOM_ID);
-			if (this.roomPassword.length > 0) {
-				this.passwordStatus = true;
-			} else {
-				this.passwordStatus = false;
-			}
-		},
-		title: function () {
-			socket.emit('title', this.title, ROOM_ID);
-			document.title = this.title;
-		},
-		power: function () {
-			if (!this.power) {
-				socket.emit('power', ROOM_ID);
-			}
-		},
-		roomClientsLimit: function () {
-			if (this.roomClientsLimit > this.count || this.roomClientsLimit < 7) {
-				socket.emit('count', this.roomClientsLimit, ROOM_ID);
-			}
-		},
-	},
-});
+//게임 버튼
+game_btn.onclick = () => {
+	document.getElementById('game_wrap').style.display = 'block';
+	document.getElementById('game_bg').style.display = 'block';
+};
 
-//채팅 기능
-let connections = {};
-const chat = document.getElementById('chat');
-myPeer.on('connection', function (con) {
-	connections[con.peer] = con;
-	con.on('data', function (data) {
-		chat.innerHTML += data + `\n`;
-		console.log('Incoming data', data);
-	});
-});
+game_close.onclick = () => {
+	document.getElementById('game_wrap').style.display = 'none';
+	document.getElementById('game_bg').style.display = 'none';
+};
 
-document.getElementById('chat_btn').addEventListener('click', () => {
-	for (const key in peers) {
+//채팅 버튼
+chat_btn.onclick = () => {
+	document.getElementById('chat_wrap').style.display = 'block';
+	document.getElementById('chat_bg').style.display = 'block';
+	for (const key in peerList) {
 		if (typeof connections[key] === 'undefined') {
 			connections[key] = myPeer.connect(key);
 			connections[key].on('data', data => {
 				chat.innerHTML += data + `\n`;
-				console.log('Incoming data', data);
 			});
 		}
 	}
-});
+};
 
-document.getElementById('send').addEventListener('click', () => {
-	chat.innerHTML += vm.$data.chatting + `\n`;
-	console.log(vm.$data.chatting);
-	for (const key in connections) {
-		connections[key].send(vm.$data.chatting);
-	}
-	vm.$data.chatting = '';
-});
-
-//방설정 버튼
-function onClickRoombtn() {
-	document.getElementById('room_wrap').style.display = 'block';
-	document.getElementById('room_bg').style.display = 'block';
-}
-function offClickRoombtn() {
-	document.getElementById('room_wrap').style.display = 'none';
-	document.getElementById('room_bg').style.display = 'none';
-}
-
-document
-	.getElementById('room_close')
-	.addEventListener('click', offClickRoombtn);
-
-//게임 버튼
-function onClickGamebtn() {
-	document.getElementById('game_wrap').style.display = 'block';
-	document.getElementById('game_bg').style.display = 'block';
-}
-function offClickGamebtn() {
-	document.getElementById('game_wrap').style.display = 'none';
-	document.getElementById('game_bg').style.display = 'none';
-}
-
-document.getElementById('game_btn').addEventListener('click', onClickGamebtn);
-document
-	.getElementById('game_close')
-	.addEventListener('click', offClickGamebtn);
-
-//채팅 버튼
-function onClickChatbtn() {
-	document.getElementById('chat_wrap').style.display = 'block';
-	document.getElementById('chat_bg').style.display = 'block';
-}
-function offClickChatbtn() {
+chat_close.onclick = () => {
 	document.getElementById('chat_wrap').style.display = 'none';
 	document.getElementById('chat_bg').style.display = 'none';
-}
+};
 
-document.getElementById('chat_btn').addEventListener('click', onClickChatbtn);
-document
-	.getElementById('chat_close')
-	.addEventListener('click', offClickChatbtn);
+const chat = document.getElementById('chat');
+
+myPeer.on('connection', con => {
+	connections[con.peer] = con;
+	con.on('data', data => {
+		chat.innerHTML += data + `\n`;
+	});
+});
+
+send.onclick = () => {
+	if (vm.$data.chatting.replace(/\s+/g, '') !== '') {
+		console.log(1);
+		chat.innerHTML += vm.$data.chatting + `\n`;
+		for (const key in connections) {
+			connections[key].send(vm.$data.chatting);
+		}
+	}
+	vm.$data.chatting = '';
+};
 
 //비디오 오디오 온오프 기능
-let videoStatus = true;
-
 video_btn.onclick = () => {
 	if (videoStatus) {
 		document
 			.getElementById('local')
 			.srcObject.getVideoTracks()[0].enabled = false;
 		document.getElementById('local').style.display = 'none';
-		document.getElementById('video_btn').style.color = 'red';
+		video_btn.style.color = 'red';
 		videoStatus = !videoStatus;
 	} else {
 		document
 			.getElementById('local')
 			.srcObject.getVideoTracks()[0].enabled = true;
 		document.getElementById('local').style.display = 'inline';
-		document.getElementById('video_btn').style.color = null;
+		video_btn.style.color = null;
 		videoStatus = !videoStatus;
 	}
 };
 
-let audioStatus = true;
 audio_btn.onclick = () => {
 	if (audioStatus) {
 		document
 			.getElementById('local')
 			.srcObject.getAudioTracks()[0].enabled = false;
-		document.getElementById('audio_btn').style.color = 'red';
+		audio_btn.style.color = 'red';
 		audioStatus = !audioStatus;
 	} else {
 		document
 			.getElementById('local')
 			.srcObject.getAudioTracks()[0].enabled = true;
-		document.getElementById('audio_btn').style.color = null;
+		audio_btn.style.color = null;
 		audioStatus = !audioStatus;
 	}
+};
+
+exit_btn.onclick = () => {
+	window.location.href = 'https://naver.com';
 };
