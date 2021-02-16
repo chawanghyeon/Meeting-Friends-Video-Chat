@@ -3,14 +3,21 @@ const express = require('express');
 const app = express();
 const https = require('https');
 const { v4: uuidV4 } = require('uuid');
+const bodyParser = require('body-parser');
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+
 app.get('/', (req, res) => {
-	res.redirect(`/${uuidV4()}`);
+	res.redirect(`/room/${uuidV4()}`);
 });
-app.get('/:room', (req, res) => {
-	res.render('room', { roomId: req.params.room });
+app.get('/room/:room', (req, res) => {
+	res.render('room', {
+		roomId: req.params.room,
+		userInfo: JSON.stringify(req.body),
+	});
 });
 
 server = https.createServer(
@@ -41,7 +48,6 @@ io.on('connection', socket => {
 			io.sockets.adapter.rooms[roomId]
 		);
 		socket.emit('set-title', titleList[roomId]);
-		socket.emit('set-power', powerList[roomId]);
 	});
 
 	socket.on('join-room', (roomId, userId) => {
@@ -78,19 +84,27 @@ io.on('connection', socket => {
 		socket.to(roomId).broadcast.emit('set-title', titleList[roomId]);
 	});
 
-	socket.on('headcount', (roomId, headcount) => {
-		headcountLimitList[roomId] = headcount;
+	socket.on('headcountLimit', (roomId, headcountLimit) => {
+		headcountLimitList[roomId] = headcountLimit;
 	});
 
 	socket.on('power', (roomId, power) => {
 		powerList[roomId] = power;
-		socket.to(roomId).broadcast.emit('set-power', powerList[roomId]);
 		socket.emit('set-power', powerList[roomId]);
+		socket.to(roomId).broadcast.emit('set-power', powerList[roomId]);
 	});
 
 	//강퇴
 	socket.on('retire', (roomId, userId) => {
 		socket.to(roomId).broadcast.emit('retire-user', userId);
+	});
+
+	socket.on('audio', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('set-audio', userId);
+	});
+
+	socket.on('video', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('set-video', userId);
 	});
 });
 
