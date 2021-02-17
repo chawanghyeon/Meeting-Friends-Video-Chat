@@ -1,7 +1,7 @@
 const socket = io('/');
 const videoGrid = document.getElementById('video-grid');
 const myVideo = document.createElement('video');
-const connections = {};
+const connectionList = {};
 const callList = {};
 const peerList = {};
 let localStream;
@@ -185,7 +185,7 @@ socket.on('user-disconnected', userId => {
 	if (peerList[userId]) {
 		peerList[userId].close();
 		delete peerList[userId];
-		delete connections[userId];
+		delete connectionList[userId];
 		vm.$data.headcount--;
 		socket.emit('power', ROOM_ID, vm.$data.userId);
 	}
@@ -234,12 +234,16 @@ socket.on('set-room', (password, headcountLimit, clients) => {
 		}
 	}
 });
+
+//화면 공유
 const startButton = document.getElementById('screen_btn');
 function handleSuccess(stream) {
 	startButton.disabled = true;
-	const video = document.querySelector('video');
+	const video = document.getElementById('local');
 	video.srcObject = stream;
 
+	const call = myPeer.call(Object.keys(peerList)[0], stream);
+	setCall(call, Object.keys(peerList)[0]);
 	// demonstrates how to detect that the user has stopped
 	// sharing the screen via the browser UI.
 	stream.getVideoTracks()[0].addEventListener('ended', () => {
@@ -259,13 +263,13 @@ function errorMsg(msg, error) {
 		console.error(error);
 	}
 }
+
 screen_btn.onclick = () => {
-	let video = document.createElement('video');
 	navigator.mediaDevices
-		.getDisplayMedia({ video: true })
+		.getDisplayMedia({ video: true, audio: true })
 		.then(handleSuccess, handleError);
-	videoGrid.append(video);
 };
+
 if (navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices) {
 	startButton.disabled = false;
 } else {
@@ -289,11 +293,19 @@ function setCall(call, userId) {
 			callList[call.peer] = call;
 			peerList[call.peer] = call;
 			vm.$data.headcount++;
+		} else {
+			callList[call.peer] = call;
+			peerList[call.peer] = call;
+			document.getElementById(userId).srcObject = userVideoStream;
 		}
 	});
 
 	call.on('close', () => {
-		div.remove();
+		if (div) {
+			div.remove();
+		} else {
+			document.getElementById(userId).parentNode.remove();
+		}
 	});
 }
 
@@ -343,6 +355,7 @@ function addVideoStream(video, stream, userId) {
 		const remoteAudioBtn = document.createElement('button');
 		const remoteVideoBtn = document.createElement('button');
 
+		video.id = userId;
 		reportBtn.id = 'click';
 		powerBtn.className = 'power';
 		retireBtn.className = 'power';
@@ -442,9 +455,9 @@ chat_btn.onclick = () => {
 	document.getElementById('chat_wrap').style.display = 'block';
 	document.getElementById('chat_bg').style.display = 'block';
 	for (const key in peerList) {
-		if (typeof connections[key] === 'undefined') {
-			connections[key] = myPeer.connect(key);
-			connections[key].on('data', data => {
+		if (typeof connectionList[key] === 'undefined') {
+			connectionList[key] = myPeer.connect(key);
+			connectionList[key].on('data', data => {
 				chat.innerHTML += data + `\n`;
 			});
 		}
@@ -459,7 +472,7 @@ chat_close.onclick = () => {
 const chat = document.getElementById('chat');
 
 myPeer.on('connection', con => {
-	connections[con.peer] = con;
+	connectionList[con.peer] = con;
 	con.on('data', data => {
 		chat.innerHTML += data + `\n`;
 	});
@@ -468,8 +481,8 @@ myPeer.on('connection', con => {
 send.onclick = () => {
 	if (vm.$data.chatting.replace(/\s+/g, '') !== '') {
 		chat.innerHTML += vm.$data.chatting + `\n`;
-		for (const key in connections) {
-			connections[key].send(vm.$data.chatting);
+		for (const key in connectionList) {
+			connectionList[key].send(vm.$data.chatting);
 		}
 	}
 	vm.$data.chatting = '';
@@ -512,7 +525,7 @@ audio_btn.onclick = () => {
 
 //나갈 때 스프링으로 통신
 exit_btn.onclick = () => {
-	//window.location.href = `http://localhost:80/${ROOM_ID}/${userEmail}`
+	//window.location.href = `http://192.168.35.115:3333/room/${userEmail}`
 	window.location.href = 'https://naver.com';
 };
 

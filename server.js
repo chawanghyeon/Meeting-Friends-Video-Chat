@@ -4,19 +4,20 @@ const app = express();
 const https = require('https');
 const { v4: uuidV4 } = require('uuid');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(cors());
 
 app.get('/', (req, res) => {
 	res.redirect(`/room/${uuidV4()}`);
 });
 app.get('/room/:room', (req, res) => {
-	res.render('room', {
+	res.render('room.ejs', {
 		roomId: req.params.room,
-		userInfo: JSON.stringify(req.body),
 	});
 });
 
