@@ -56,6 +56,7 @@ if (location.hostname === '192.168.35.115') {
 const vm = new Vue({
 	el: '#app',
 	data: {
+		time: 0,
 		headcount: 1,
 		power: false,
 		title: '',
@@ -233,6 +234,43 @@ socket.on('set-room', (password, headcountLimit, clients) => {
 		}
 	}
 });
+const startButton = document.getElementById('screen_btn');
+function handleSuccess(stream) {
+	startButton.disabled = true;
+	const video = document.querySelector('video');
+	video.srcObject = stream;
+
+	// demonstrates how to detect that the user has stopped
+	// sharing the screen via the browser UI.
+	stream.getVideoTracks()[0].addEventListener('ended', () => {
+		errorMsg('The user has ended sharing the screen');
+		startButton.disabled = false;
+	});
+}
+
+function handleError(error) {
+	errorMsg(`getDisplayMedia error: ${error.name}`, error);
+}
+
+function errorMsg(msg, error) {
+	const errorElement = document.querySelector('#errorMsg');
+	errorElement.innerHTML += `<p>${msg}</p>`;
+	if (typeof error !== 'undefined') {
+		console.error(error);
+	}
+}
+screen_btn.onclick = () => {
+	let video = document.createElement('video');
+	navigator.mediaDevices
+		.getDisplayMedia({ video: true })
+		.then(handleSuccess, handleError);
+	videoGrid.append(video);
+};
+if (navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices) {
+	startButton.disabled = false;
+} else {
+	errorMsg('getDisplayMedia is not supported');
+}
 
 getUserMedia({ video: true, audio: true }, stream => {
 	if (typeof localStream === 'undefined') {
@@ -476,4 +514,55 @@ audio_btn.onclick = () => {
 exit_btn.onclick = () => {
 	//window.location.href = `http://localhost:80/${ROOM_ID}/${userEmail}`
 	window.location.href = 'https://naver.com';
+};
+
+//타이머
+const timer = document.getElementById('timer');
+let countStatus = false;
+let timeInterval;
+let time = 0;
+let min = 0;
+let sec = 0;
+
+countup_btn.onclick = () => {
+	vm.$data.time = 0;
+	countStatus = !countStatus;
+	if (countStatus) {
+		timeInterval = setInterval(() => {
+			min = parseInt(time / 60);
+			sec = time % 60;
+			timer.innerHTML = min + '분' + sec + '초';
+			time++;
+		}, 1000);
+	} else {
+		clearInterval(timeInterval);
+	}
+};
+
+countdown_btn.onclick = () => {
+	vm.$data.time = Number(vm.$data.time);
+	if (vm.$data.time > 0) {
+		time = vm.$data.time * 60;
+	}
+	vm.$data.time = 0;
+	countStatus = !countStatus;
+	if (countStatus) {
+		timeInterval = setInterval(() => {
+			min = parseInt(time / 60);
+			sec = time % 60;
+			timer.innerHTML = min + '분' + sec + '초';
+			time--;
+			if (time < 0) {
+				clearInterval(timeInterval);
+				alert('시간이 초과되었습니다.');
+			}
+		}, 1000);
+	} else {
+		clearInterval(timeInterval);
+	}
+};
+
+countreset_btn.onclick = () => {
+	clearInterval(timeInterval);
+	timer.innerHTML = '';
 };
