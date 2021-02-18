@@ -21,15 +21,15 @@ app.use(
 	})
 );
 
-app.get('/', (req, res) => {
-	res.redirect(`/room/${uuidV4()}`);
-});
 app.get('/room/:room', (req, res) => {
-	console.log(req.headers);
-	res.render('room.ejs', {
-		roomId: req.params.room,
-		test: req,
-	});
+	if (req.headers.referer === 'http://localhost:8081/waittingroom') {
+		res.render('room.ejs', {
+			roomId: req.params.room,
+			test: req,
+		});
+	} else {
+		res.redirect('http://localhost:8081/waittingroom');
+	}
 });
 
 server = https.createServer(

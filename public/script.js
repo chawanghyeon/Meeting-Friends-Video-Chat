@@ -81,6 +81,7 @@ const vm = new Vue({
 			gender: '',
 		},
 		userInfo: {},
+		testRoom: {},
 	},
 	computed: {
 		title() {
@@ -389,24 +390,31 @@ function getParameterByName(name) {
 //스프링과 통신
 function sendRoomData(roomInfo) {
 	axios
-		.post(`http://localhost:80/changeroominfo`, JSON.stringify(roomInfo), {
-			headers: { 'Content-Type': `application/json` },
-		})
+		.post(
+			`http://localhost:80/changeroominfo`,
+			JSON.stringify(vm.$data.testRoom),
+			{
+				headers: { 'Content-Type': `application/json` },
+			}
+		)
 		.then(response => {
-			console.log(response);
+			console.log(response.data);
 		})
-		.catch(() => {
+		.catch(e => {
+			console.log(e);
 			alert('방 정보를 저장하는 중 문제가 발생했습니다.');
 		});
 }
-
+let e;
 function getRoomInfo() {
 	axios
 		.get(`http://localhost:80/room/${ROOM_ID}`, {
 			headers: { 'Access-Control-Allow-Origin': '*' },
 		})
 		.then(response => {
-			vm.$data.roomInfo = response.data;
+			e = response.data;
+			console.log(e);
+			vm.$data.testRoom = response.data;
 		})
 		.catch(e => {
 			console.log(e);
@@ -620,7 +628,7 @@ exit_btn.onclick = () => {
 			`http://localhost:80/exitroom/room/${ROOM_ID}/user/${vm.$data.userEmail}`
 		)
 		.then(() => {
-			window.location.href = 'https://naver.com';
+			window.location.href = 'http://192.168.35.115:8081/waittingroom';
 		})
 		.catch(() => {
 			alert('나가는 중 문제가 발생했습니다.');
@@ -677,3 +685,15 @@ countreset_btn.onclick = () => {
 	clearInterval(timeInterval);
 	timer.innerHTML = '';
 };
+
+function doNotReload() {
+	if (
+		(event.ctrlKey == true && (event.keyCode == 78 || event.keyCode == 82)) ||
+		event.keyCode == 116
+	) {
+		event.keyCode = 0;
+		event.cancelBubble = true;
+		event.returnValue = false;
+	}
+}
+document.onkeydown = doNotReload;
