@@ -5,15 +5,24 @@ const connectionList = {};
 const callList = {};
 const peerList = {};
 let localStream;
+let localScreenStream;
 let myPeer;
 let videoStatus = true;
 let audioStatus = true;
 myVideo.muted = true;
 myVideo.id = 'local';
-let getUserMedia =
-	navigator.getUserMedia ||
-	navigator.webkitGetUserMedia ||
-	navigator.mozGetUserMedia;
+
+navigator.mediaDevices
+	.getUserMedia({ video: true, audio: true })
+	.then(stream => {
+		if (typeof localStream === 'undefined') {
+			localStream = stream;
+		}
+		addVideoStream(myVideo, localStream);
+	})
+	.catch(error => {
+		console.log(error);
+	});
 
 //배포할 때 192.168.35.115주소인 경우는 삭제
 if (location.hostname === '192.168.35.115') {
@@ -59,42 +68,70 @@ const vm = new Vue({
 		time: 0,
 		headcount: 1,
 		power: false,
-		title: '',
 		userId: '',
 		chatting: '',
 		userEmail: '',
 		roomPassword: '',
-		headcountLimit: 6,
-		roomInfo: {},
+		roomInfo: {
+			title: '',
+			maxPeople: 6,
+			theme: '',
+			minAge: 0,
+			maxAge: 0,
+			gender: '',
+		},
 		userInfo: {},
+	},
+	computed: {
+		title() {
+			return this.roomInfo.title;
+		},
+		maxPeople() {
+			return this.roomInfo.maxPeople;
+		},
+		theme() {
+			return this.roomInfo.theme;
+		},
 	},
 	methods: {
 		setRoom: function (data) {
-			this.title = data.title.value;
+			this.roomInfo.title = data.title.value;
 			this.roomPassword = data.pw.value;
-			this.headcountLimit = data.limit.value;
-			alert('적용완료');
+			this.roomInfo.maxPeople = data.maxpeople.value;
+			this.roomInfo.maxAge = data.maxage.value;
+			this.roomInfo.minAge = data.minage.value;
+			this.roomInfo.theme = data.theme.value;
+			this.roomInfo.gender = data.gender.value;
+			sendRoomData(this.roomInfo);
 		},
 	},
 	watch: {
+		theme: function () {
+			if (this.roomInfo.theme === '클럽하우스') {
+				socket.emit('clubhouse', ROOM_ID);
+			}
+		},
 		roomPassword: function () {
 			socket.emit('password', ROOM_ID, this.roomPassword);
 		},
 		title: function () {
-			socket.emit('title', ROOM_ID, this.title);
-			document.title = this.title;
+			socket.emit('title', ROOM_ID, this.roomInfo.title);
+			document.title = this.roomInfo.title;
 		},
-		headcountLimit: function () {
-			if (this.headcountLimit >= this.headcount && this.headcountLimit < 7) {
-				socket.emit('headcountLimit', ROOM_ID, this.headcountLimit);
+		maxPeople: function () {
+			if (
+				this.roomInfo.maxPeople >= this.headcount &&
+				this.roomInfo.maxPeople < 7
+			) {
+				socket.emit('maxPeople', ROOM_ID, this.roomInfo.maxPeople);
 				console.log('emit');
 			} else {
-				this.headcountLimit = this.headcount;
+				this.roomInfo.maxPeople = this.headcount;
 			}
-			if (this.headcountLimit === '') {
-				this.headcountLimit = 0;
+			if (this.roomInfo.maxPeople === '') {
+				this.roomInfo.maxPeople = 0;
 			}
-			this.headcountLimit = Number(this.headcountLimit);
+			this.roomInfo.maxPeople = Number(this.roomInfo.maxPeople);
 		},
 		power: function () {
 			if (vm.$data.power) {
@@ -118,32 +155,49 @@ myPeer.on('open', id => {
 	socket.emit('check-room', ROOM_ID);
 	vm.$data.roomId = ROOM_ID;
 	vm.$data.userId = id;
-	vm.$data.userInfo = USER_INFO;
 	vm.$data.userEmail = getParameterByName('userEmail');
-	// if (vm.$data.userEmail !== '') {
-	// 	getUserInfo();
-	// 	getRoomInfo();
-	// }
+	socket.emit('email', id, vm.$data.userEmail);
+	if (vm.$data.userEmail !== '') {
+		getUserInfo();
+		getRoomInfo();
+	}
 });
 
 //연결을 요청하는 곳에서 받는 call
 myPeer.on('call', call => {
-	getUserMedia({ video: true, audio: true }, function (stream) {
-		if (typeof localStream === 'undefined') {
-			localStream = stream;
-		}
-		call.answer(localStream);
-		setCall(call, call.peer);
-	});
+	navigator.mediaDevices
+		.getUserMedia({ video: true, audio: true })
+		.then(function (stream) {
+			if (typeof localStream === 'undefined') {
+				localStream = stream;
+			}
+			call.answer(localStream);
+			setCall(call, call.peer);
+		})
+		.catch(error => {
+			console.log(error);
+		});
 });
 
 myPeer.on('error', e => {
 	alert(e);
 });
 
+socket.on('set-clubhouse', () => {
+	if (!vm.$data.power) {
+		document
+			.getElementById('local')
+			.srcObject.getVideoTracks()[0].enabled = false;
+		document.getElementById('video_btn').style.display = 'none';
+		document.getElementById('audio_btn').style.display = 'none';
+		document.getElementById('timer_btn').style.display = 'none';
+		document.getElementById('screen_btn').style.display = 'none';
+	}
+});
+
 socket.on('set-title', title => {
 	if (title) {
-		vm.$data.title = title;
+		vm.$data.roomInfo.title = title;
 		document.title = title;
 	}
 });
@@ -188,15 +242,22 @@ socket.on('user-disconnected', userId => {
 		delete connectionList[userId];
 		vm.$data.headcount--;
 		socket.emit('power', ROOM_ID, vm.$data.userId);
+		//exit
+		console.log(1);
 	}
 });
 
 socket.on('user-connected', newUserId => {
-	const call = myPeer.call(newUserId, localStream);
-	setCall(call, newUserId);
+	let callUser;
+	if (startButton.disabled) {
+		callUser = myPeer.call(newUserId, localScreenStream);
+	} else {
+		callUser = myPeer.call(newUserId, localStream);
+	}
+	setCall(callUser, newUserId);
 });
 
-socket.on('set-room', (password, headcountLimit, clients) => {
+socket.on('enter-room', (password, maxPeople, clients) => {
 	if (password) {
 		//비밀번호가 있는 경우
 		let returnValue = prompt('비밀번호를 입력하세요');
@@ -204,8 +265,8 @@ socket.on('set-room', (password, headcountLimit, clients) => {
 			//비밀번호가 맞은 경우
 			if (clients) {
 				//방인원제한이 있는 경우
-				if (clients.length < headcountLimit) {
-					console.log(clients.length, headcountLimit);
+				if (clients.length < maxPeople) {
+					console.log(clients.length, maxPeople);
 					socket.emit('join-room', ROOM_ID, vm.$data.userId);
 				} else {
 					alert('Room ' + ROOM_ID + ' is full');
@@ -223,7 +284,7 @@ socket.on('set-room', (password, headcountLimit, clients) => {
 	} else {
 		//비밀번호가 없는 경우
 		if (clients) {
-			if (clients.length < headcountLimit) {
+			if (clients.length < maxPeople) {
 				socket.emit('join-room', ROOM_ID, vm.$data.userId);
 			} else {
 				alert('Room ' + ROOM_ID + ' is full');
@@ -237,18 +298,30 @@ socket.on('set-room', (password, headcountLimit, clients) => {
 
 //화면 공유
 const startButton = document.getElementById('screen_btn');
+
 function handleSuccess(stream) {
 	startButton.disabled = true;
 	const video = document.getElementById('local');
 	video.srcObject = stream;
+	localScreenStream = stream;
+	//for문으로 모든 유저한테 공유하기
+	makeScreenCall(stream);
+	stream.getdocument
+		.getElementById('local')
+		.srcObject.getVideoTracks()[0]
+		.enableds()[0]
+		.addEventListener('ended', () => {
+			startButton.disabled = false;
+			video.srcObject = localStream;
+			makeScreenCall(localStream);
+			errorMsg('The user has ended sharing the screen');
+		});
+}
 
-	const call = myPeer.call(Object.keys(peerList)[0], stream);
-	setCall(call, Object.keys(peerList)[0]);
-	// demonstrates how to detect that the user has stopped
-	// sharing the screen via the browser UI.
-	stream.getVideoTracks()[0].addEventListener('ended', () => {
-		errorMsg('The user has ended sharing the screen');
-		startButton.disabled = false;
+function makeScreenCall(stream) {
+	Object.keys(peerList).forEach(element => {
+		const call = myPeer.call(element, stream);
+		setCall(call, element);
 	});
 }
 
@@ -270,18 +343,12 @@ screen_btn.onclick = () => {
 		.then(handleSuccess, handleError);
 };
 
-if (navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices) {
-	startButton.disabled = false;
-} else {
-	errorMsg('getDisplayMedia is not supported');
-}
-
-getUserMedia({ video: true, audio: true }, stream => {
-	if (typeof localStream === 'undefined') {
-		localStream = stream;
-	}
-	addVideoStream(myVideo, localStream);
-});
+//이거 에러???
+// if (navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices) {
+// 	startButton.disabled = false;
+// } else {
+// 	errorMsg('getDisplayMedia is not supported');
+// }
 
 function setCall(call, userId) {
 	const video = document.createElement('video');
@@ -320,27 +387,46 @@ function getParameterByName(name) {
 }
 
 //스프링과 통신
-// function getUserInfo() {
-// 	axios
-// 		.get(`http://localhost:80/room/${ROOM_ID}/user/${userEmail}`)
-// 		.then(response => {
-// 			vm.$data.userInfo = response.data;
-// 		})
-// 		.catch(() => {
-// 			alert('사용자 정보를 가져오는 중 문제가 발생했습니다.');
-// 		});
-// }
+function sendRoomData(roomInfo) {
+	axios
+		.post(`http://localhost:80/changeroominfo`, JSON.stringify(roomInfo), {
+			headers: { 'Content-Type': `application/json` },
+		})
+		.then(response => {
+			console.log(response);
+		})
+		.catch(() => {
+			alert('방 정보를 저장하는 중 문제가 발생했습니다.');
+		});
+}
 
-// function getRoomInfo() {
-// 	axios
-// 		.get(`http://localhost:80/room/${ROOM_ID}`)
-// 		.then(response => {
-// 			vm.$data.roomInfo = response.data;
-// 		})
-// 		.catch(() => {
-// 			alert('방 정보를 가져오는 중 문제가 발생했습니다.');
-// 		});
-// }
+function getRoomInfo() {
+	axios
+		.get(`http://localhost:80/room/${ROOM_ID}`, {
+			headers: { 'Access-Control-Allow-Origin': '*' },
+		})
+		.then(response => {
+			vm.$data.roomInfo = response.data;
+		})
+		.catch(e => {
+			console.log(e);
+			alert('방 정보를 가져오는 중 문제가 발생했습니다.');
+		});
+}
+
+function getUserInfo() {
+	axios
+		.get(`http://localhost:80/user/${vm.$data.userEmail}`, {
+			headers: { 'Access-Control-Allow-Origin': '*' },
+		})
+		.then(response => {
+			vm.$data.userInfo = response.data;
+		})
+		.catch(e => {
+			console.log(e);
+			alert('유저 정보를 가져오는 중 문제가 발생했습니다.');
+		});
+}
 
 function addVideoStream(video, stream, userId) {
 	video.srcObject = stream;
@@ -381,11 +467,13 @@ function addVideoStream(video, stream, userId) {
 			if (returnValue) {
 				returnValue = prompt('신고할 내용을 입력하세요.');
 				axios
-					.post(`http://localhost:80/${ROOM_ID}/${userEmail}`, {
-						params: {
-							report: returnValue,
-						},
-					})
+					.post(
+						`http://localhost:80/report/${vm.$data.userEmail}`,
+						JSON.stringify({ report: returnValue }),
+						{
+							headers: { 'Content-Type': `application/json` },
+						}
+					)
 					.then(message => {
 						alert(message);
 					})
@@ -440,14 +528,14 @@ room_btn.onclick = () => {
 };
 
 //게임 버튼
-game_btn.onclick = () => {
-	document.getElementById('game_wrap').style.display = 'block';
-	document.getElementById('game_bg').style.display = 'block';
+timer_btn.onclick = () => {
+	document.getElementById('timer_wrap').style.display = 'block';
+	document.getElementById('timer_bg').style.display = 'block';
 };
 
-game_close.onclick = () => {
-	document.getElementById('game_wrap').style.display = 'none';
-	document.getElementById('game_bg').style.display = 'none';
+timer_close.onclick = () => {
+	document.getElementById('timer_wrap').style.display = 'none';
+	document.getElementById('timer_bg').style.display = 'none';
 };
 
 //채팅 버튼
@@ -525,8 +613,18 @@ audio_btn.onclick = () => {
 
 //나갈 때 스프링으로 통신
 exit_btn.onclick = () => {
-	//window.location.href = `http://192.168.35.115:3333/room/${userEmail}`
-	window.location.href = 'https://naver.com';
+	//window.location.href = `http://192.168.35.115:80/exitroom/room/${roomid}/user/${userEmail}/
+	//get방식
+	axios
+		.get(
+			`http://localhost:80/exitroom/room/${ROOM_ID}/user/${vm.$data.userEmail}`
+		)
+		.then(() => {
+			window.location.href = 'https://naver.com';
+		})
+		.catch(() => {
+			alert('나가는 중 문제가 발생했습니다.');
+		});
 };
 
 //타이머

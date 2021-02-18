@@ -5,19 +5,30 @@ const https = require('https');
 const { v4: uuidV4 } = require('uuid');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+var session = require('express-session');
+const axios = require('axios');
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
+app.use(
+	session({
+		secret: 'asadlfkj!@#!@#dfgasdg',
+		resave: false,
+		saveUninitialized: true,
+	})
+);
 
 app.get('/', (req, res) => {
 	res.redirect(`/room/${uuidV4()}`);
 });
 app.get('/room/:room', (req, res) => {
+	console.log(req.headers);
 	res.render('room.ejs', {
 		roomId: req.params.room,
+		test: req,
 	});
 });
 
@@ -34,18 +45,19 @@ const io = require('socket.io')(server);
 const passwordList = {};
 const titleList = {};
 const powerList = {};
-const headcountLimitList = {};
+const maxPeopleList = {};
+const emailList = {};
 
 io.on('connection', socket => {
 	//클라이언트가 맨처음 로딩 시 방에 대해서 체크
 	socket.on('check-room', roomId => {
-		if (!headcountLimitList[roomId]) {
-			headcountLimitList[roomId] = 6;
+		if (!maxPeopleList[roomId]) {
+			maxPeopleList[roomId] = 6;
 		}
 		socket.emit(
-			'set-room',
+			'enter-room',
 			passwordList[roomId],
-			headcountLimitList[roomId],
+			maxPeopleList[roomId],
 			io.sockets.adapter.rooms[roomId]
 		);
 		socket.emit('set-title', titleList[roomId]);
@@ -68,6 +80,14 @@ io.on('connection', socket => {
 
 		//연결이 끊어졌을 때
 		socket.on('disconnect', () => {
+			axios
+				.get(
+					`http://localhost:80/exitroom/room/${roomId}/user/${emailList[userId]}`
+				)
+				.then(() => {})
+				.catch(error => {
+					console.log(error);
+				});
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
 			if (io.engine.clientsCount === 0) {
 				delete passwordList[roomId];
@@ -85,8 +105,8 @@ io.on('connection', socket => {
 		socket.to(roomId).broadcast.emit('set-title', titleList[roomId]);
 	});
 
-	socket.on('headcountLimit', (roomId, headcountLimit) => {
-		headcountLimitList[roomId] = headcountLimit;
+	socket.on('maxPeople', (roomId, headcountLimit) => {
+		maxPeopleList[roomId] = headcountLimit;
 	});
 
 	socket.on('power', (roomId, power) => {
@@ -106,6 +126,14 @@ io.on('connection', socket => {
 
 	socket.on('video', (roomId, userId) => {
 		socket.to(roomId).broadcast.emit('set-video', userId);
+	});
+
+	socket.on('clubhouse', roomId => {
+		socket.to(roomId).broadcast.emit('set-clubhouse');
+	});
+
+	socket.on('email', (userId, userEmail) => {
+		emailList[userId] = userEmail;
 	});
 });
 
