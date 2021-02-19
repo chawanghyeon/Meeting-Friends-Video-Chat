@@ -22,14 +22,14 @@ app.use(
 );
 
 app.get('/room/:room', (req, res) => {
-	if (req.headers.referer === 'http://localhost:8081/waittingroom') {
-		res.render('room.ejs', {
-			roomId: req.params.room,
-			test: req,
-		});
-	} else {
-		res.redirect('http://localhost:8081/waittingroom');
-	}
+	// if (req.headers.referer === 'http://localhost:8081/waittingroom') {
+	res.render('room.ejs', {
+		roomId: req.params.room,
+		test: req,
+	});
+	// } else {
+	// 	res.redirect('http://localhost:8081/waittingroom');
+	// }
 });
 
 server = https.createServer(
@@ -58,7 +58,7 @@ io.on('connection', socket => {
 			'enter-room',
 			passwordList[roomId],
 			maxPeopleList[roomId],
-			io.sockets.adapter.rooms[roomId]
+			io.sockets.adapter.rooms[roomId] //현재 방에 있는 인원수
 		);
 		socket.emit('set-title', titleList[roomId]);
 	});
@@ -80,14 +80,14 @@ io.on('connection', socket => {
 
 		//연결이 끊어졌을 때
 		socket.on('disconnect', () => {
-			axios
-				.get(
-					`http://localhost:80/exitroom/room/${roomId}/user/${emailList[userId]}`
-				)
-				.then(() => {})
-				.catch(error => {
-					console.log(error);
-				});
+			// axios
+			// 	.get(
+			// 		`http://localhost:80/exitroom/room/${roomId}/user/${emailList[userId]}`
+			// 	)
+			// 	.then(() => {})
+			// 	.catch(error => {
+			// 		console.log(error);
+			// 	});
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
 			if (io.engine.clientsCount === 0) {
 				delete passwordList[roomId];
@@ -130,6 +130,10 @@ io.on('connection', socket => {
 
 	socket.on('clubhouse', roomId => {
 		socket.to(roomId).broadcast.emit('set-clubhouse');
+	});
+
+	socket.on('voice', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('set-voice', userId);
 	});
 
 	socket.on('email', (userId, userEmail) => {

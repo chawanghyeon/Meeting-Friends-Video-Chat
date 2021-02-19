@@ -7,6 +7,7 @@ const peerList = {};
 let localStream;
 let localScreenStream;
 let myPeer;
+let videoFocus = true;
 let videoStatus = true;
 let audioStatus = true;
 myVideo.muted = true;
@@ -76,8 +77,6 @@ const vm = new Vue({
 			title: '',
 			maxPeople: 6,
 			theme: '',
-			minAge: 0,
-			maxAge: 0,
 			gender: '',
 		},
 		userInfo: {},
@@ -99,8 +98,6 @@ const vm = new Vue({
 			this.roomInfo.title = data.title.value;
 			this.roomPassword = data.pw.value;
 			this.roomInfo.maxPeople = data.maxpeople.value;
-			this.roomInfo.maxAge = data.maxage.value;
-			this.roomInfo.minAge = data.minage.value;
 			this.roomInfo.theme = data.theme.value;
 			this.roomInfo.gender = data.gender.value;
 			sendRoomData(this.roomInfo);
@@ -110,6 +107,14 @@ const vm = new Vue({
 		theme: function () {
 			if (this.roomInfo.theme === '클럽하우스') {
 				socket.emit('clubhouse', ROOM_ID);
+				let powerBtns = document.getElementsByClassName('power');
+				for (let i = 2; i < powerBtns.length; i++) {
+					powerBtns[i].style.display = 'none';
+				}
+				let voiceBtns = document.getElementsByClassName('voice');
+				for (let i = 0; i < voiceBtns.length; i++) {
+					voiceBtns[i].style.display = 'inline-block';
+				}
 			}
 		},
 		roomPassword: function () {
@@ -153,15 +158,16 @@ const vm = new Vue({
 //peer가 생성되었을 때 실행
 myPeer.on('open', id => {
 	console.log(id, 'myid');
-	socket.emit('check-room', ROOM_ID);
 	vm.$data.roomId = ROOM_ID;
 	vm.$data.userId = id;
 	vm.$data.userEmail = getParameterByName('userEmail');
 	socket.emit('email', id, vm.$data.userEmail);
-	if (vm.$data.userEmail !== '') {
-		getUserInfo();
-		getRoomInfo();
-	}
+	// if (vm.$data.userEmail !== '') {
+	// 	getUserInfo();
+	// 	getRoomInfo();
+	// }
+	//가져온 방 정보를 기준으로 확인
+	socket.emit('check-room', ROOM_ID);
 });
 
 //연결을 요청하는 곳에서 받는 call
@@ -188,11 +194,16 @@ socket.on('set-clubhouse', () => {
 	if (!vm.$data.power) {
 		document
 			.getElementById('local')
-			.srcObject.getVideoTracks()[0].enabled = false;
-		document.getElementById('video_btn').style.display = 'none';
+			.srcObject.getAudioTracks()[0].enabled = false;
 		document.getElementById('audio_btn').style.display = 'none';
-		document.getElementById('timer_btn').style.display = 'none';
-		document.getElementById('screen_btn').style.display = 'none';
+	}
+});
+
+socket.on('set-voice', userId => {
+	if (vm.$data.userId === userId) {
+		document.getElementById('audio_btn').style.display = 'inline-block';
+	} else {
+		document.getElementById('audio_btn').style.display = 'none';
 	}
 });
 
@@ -448,14 +459,17 @@ function addVideoStream(video, stream, userId) {
 		const retireBtn = document.createElement('button');
 		const remoteAudioBtn = document.createElement('button');
 		const remoteVideoBtn = document.createElement('button');
+		const voiceBtn = document.createElement('button');
 
 		video.id = userId;
 		reportBtn.id = 'click';
+		voiceBtn.className = 'voice';
 		powerBtn.className = 'power';
 		retireBtn.className = 'power';
 		remoteAudioBtn.className = 'power';
 		remoteVideoBtn.className = 'power';
 
+		voiceBtn.innerHTML = '발언권';
 		powerBtn.innerHTML = '방장';
 		reportBtn.innerHTML = '신고';
 		retireBtn.innerHTML = '강퇴';
@@ -463,6 +477,12 @@ function addVideoStream(video, stream, userId) {
 		remoteVideoBtn.innerHTML = '비디오';
 
 		//각 버튼의 기능
+		voiceBtn.onclick = () => {
+			let returnValue = confirm('발언권을 넘기시겠습니까?');
+			if (returnValue) {
+				socket.emit('voice', ROOM_ID, userId);
+			}
+		};
 		powerBtn.onclick = () => {
 			let returnValue = confirm('방장권한을 넘기시겠습니까?');
 			if (returnValue) {
@@ -509,16 +529,30 @@ function addVideoStream(video, stream, userId) {
 			remoteAudioBtn.style.display = 'none';
 			remoteVideoBtn.style.display = 'none';
 		}
+		voiceBtn.style.display = 'none';
 
 		div.append(video);
 		div.append(reportBtn);
 		div.append(powerBtn);
 		div.append(retireBtn);
+		div.append(voiceBtn);
 		div.append(remoteAudioBtn);
 		div.append(remoteVideoBtn);
 	} else {
 		div.append(video);
 	}
+
+	video.addEventListener('dblclick', () => {
+		if (videoFocus) {
+			alert(userId);
+			div.remove();
+			videoGrid.style.display = 'none';
+			let focus = document.getElementById('focus');
+			focus.append(div);
+			focus.style.width = '100vw';
+			focus.style.height = '100vh';
+		}
+	});
 
 	videoGrid.append(div);
 	return div;
@@ -686,14 +720,14 @@ countreset_btn.onclick = () => {
 	timer.innerHTML = '';
 };
 
-function doNotReload() {
-	if (
-		(event.ctrlKey == true && (event.keyCode == 78 || event.keyCode == 82)) ||
-		event.keyCode == 116
-	) {
-		event.keyCode = 0;
-		event.cancelBubble = true;
-		event.returnValue = false;
-	}
-}
-document.onkeydown = doNotReload;
+// function doNotReload() {
+// 	if (
+// 		(event.ctrlKey == true && (event.keyCode == 78 || event.keyCode == 82)) ||
+// 		event.keyCode == 116
+// 	) {
+// 		event.keyCode = 0;
+// 		event.cancelBubble = true;
+// 		event.returnValue = false;
+// 	}
+// }
+// document.onkeydown = doNotReload;
