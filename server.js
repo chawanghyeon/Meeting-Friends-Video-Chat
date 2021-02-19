@@ -5,7 +5,6 @@ const https = require('https');
 const { v4: uuidV4 } = require('uuid');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-var session = require('express-session');
 const axios = require('axios');
 
 app.set('view engine', 'ejs');
@@ -13,23 +12,16 @@ app.use(express.static('public'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
-app.use(
-	session({
-		secret: 'asadlfkj!@#!@#dfgasdg',
-		resave: false,
-		saveUninitialized: true,
-	})
-);
 
 app.get('/room/:room', (req, res) => {
-	// if (req.headers.referer === 'http://localhost:8081/waittingroom') {
-	res.render('room.ejs', {
-		roomId: req.params.room,
-		test: req,
-	});
-	// } else {
-	// 	res.redirect('http://localhost:8081/waittingroom');
-	// }
+	if (req.headers.referer === 'http://localhost:8081/waittingroom') {
+		res.render('room.ejs', {
+			roomId: req.params.room,
+			test: req,
+		});
+	} else {
+		res.redirect('http://localhost:8081/waittingroom');
+	}
 });
 
 server = https.createServer(
@@ -43,7 +35,6 @@ const io = require('socket.io')(server);
 
 //서버운영중 필요한 데이터들
 const passwordList = {};
-const titleList = {};
 const powerList = {};
 const maxPeopleList = {};
 const emailList = {};
@@ -51,16 +42,11 @@ const emailList = {};
 io.on('connection', socket => {
 	//클라이언트가 맨처음 로딩 시 방에 대해서 체크
 	socket.on('check-room', roomId => {
-		if (!maxPeopleList[roomId]) {
-			maxPeopleList[roomId] = 6;
-		}
 		socket.emit(
 			'enter-room',
 			passwordList[roomId],
-			maxPeopleList[roomId],
 			io.sockets.adapter.rooms[roomId] //현재 방에 있는 인원수
 		);
-		socket.emit('set-title', titleList[roomId]);
 	});
 
 	socket.on('join-room', (roomId, userId) => {
@@ -80,14 +66,14 @@ io.on('connection', socket => {
 
 		//연결이 끊어졌을 때
 		socket.on('disconnect', () => {
-			// axios
-			// 	.get(
-			// 		`http://localhost:80/exitroom/room/${roomId}/user/${emailList[userId]}`
-			// 	)
-			// 	.then(() => {})
-			// 	.catch(error => {
-			// 		console.log(error);
-			// 	});
+			axios
+				.get(
+					`http://localhost:80/exitroom/room/${roomId}/user/${emailList[userId]}`
+				)
+				.then(() => {})
+				.catch(error => {
+					console.log(error);
+				});
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
 			if (io.engine.clientsCount === 0) {
 				delete passwordList[roomId];
@@ -100,9 +86,9 @@ io.on('connection', socket => {
 		passwordList[roomId] = password;
 	});
 
+	//제목 설정
 	socket.on('title', (roomId, title) => {
-		titleList[roomId] = title;
-		socket.to(roomId).broadcast.emit('set-title', titleList[roomId]);
+		socket.to(roomId).broadcast.emit('set-title', title);
 	});
 
 	socket.on('maxPeople', (roomId, headcountLimit) => {
@@ -120,6 +106,7 @@ io.on('connection', socket => {
 		socket.to(roomId).broadcast.emit('retire-user', userId);
 	});
 
+	//오디오 비디오 끄기
 	socket.on('audio', (roomId, userId) => {
 		socket.to(roomId).broadcast.emit('set-audio', userId);
 	});
@@ -128,16 +115,32 @@ io.on('connection', socket => {
 		socket.to(roomId).broadcast.emit('set-video', userId);
 	});
 
-	socket.on('clubhouse', roomId => {
+	//클럽하우스 모드
+	socket.on('on-clubhouse', roomId => {
 		socket.to(roomId).broadcast.emit('set-clubhouse');
 	});
 
+	socket.on('off-clubhouse', roomId => {
+		socket.to(roomId).broadcast.emit('remove-clubhouse');
+	});
+
+	//발언권 주기
 	socket.on('voice', (roomId, userId) => {
 		socket.to(roomId).broadcast.emit('set-voice', userId);
 	});
 
+	//peerid로 uesrEmail찾기
 	socket.on('email', (userId, userEmail) => {
 		emailList[userId] = userEmail;
+	});
+
+	//timer설정
+	socket.on('on-countUp', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('set-countUp', userId);
+	});
+
+	socket.on('off-countUp', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('remove-countUp', userId);
 	});
 });
 

@@ -4,6 +4,7 @@ const myVideo = document.createElement('video');
 const connectionList = {};
 const callList = {};
 const peerList = {};
+let timer;
 let localStream;
 let localScreenStream;
 let myPeer;
@@ -19,7 +20,10 @@ navigator.mediaDevices
 		if (typeof localStream === 'undefined') {
 			localStream = stream;
 		}
-		addVideoStream(myVideo, localStream);
+		addVideoStream(myVideo, localStream, vm.$data.userId);
+		if (vm.$data.roomInfo.theme === '클럽하우스') {
+			onClubHouseMode();
+		}
 	})
 	.catch(error => {
 		console.log(error);
@@ -73,12 +77,7 @@ const vm = new Vue({
 		chatting: '',
 		userEmail: '',
 		roomPassword: '',
-		roomInfo: {
-			title: '',
-			maxPeople: 6,
-			theme: '',
-			gender: '',
-		},
+		roomInfo: {},
 		userInfo: {},
 		testRoom: {},
 	},
@@ -95,26 +94,32 @@ const vm = new Vue({
 	},
 	methods: {
 		setRoom: function (data) {
-			this.roomInfo.title = data.title.value;
-			this.roomPassword = data.pw.value;
-			this.roomInfo.maxPeople = data.maxpeople.value;
-			this.roomInfo.theme = data.theme.value;
-			this.roomInfo.gender = data.gender.value;
-			sendRoomData(this.roomInfo);
+			if (
+				data.title.value !== '' &&
+				data.pw.value !== '' &&
+				data.maxPeople.value !== '' &&
+				data.theme.value !== ''
+			) {
+				console.log(data.title.value);
+				this.roomInfo.title = data.title.value;
+				this.roomPassword = data.pw.value;
+				this.roomInfo.maxPeople = data.maxPeople.value;
+				this.roomInfo.theme = data.theme.value;
+				sendRoomData();
+			} else {
+				alert('입력칸을 모두 채워주세요');
+			}
 		},
 	},
 	watch: {
 		theme: function () {
 			if (this.roomInfo.theme === '클럽하우스') {
-				socket.emit('clubhouse', ROOM_ID);
-				let powerBtns = document.getElementsByClassName('power');
-				for (let i = 2; i < powerBtns.length; i++) {
-					powerBtns[i].style.display = 'none';
-				}
+				socket.emit('on-clubhouse', ROOM_ID);
 				let voiceBtns = document.getElementsByClassName('voice');
 				for (let i = 0; i < voiceBtns.length; i++) {
 					voiceBtns[i].style.display = 'inline-block';
 				}
+				document.getElementById('offClubHouseMode_btn').disabled = false;
 			}
 		},
 		roomPassword: function () {
@@ -127,10 +132,9 @@ const vm = new Vue({
 		maxPeople: function () {
 			if (
 				this.roomInfo.maxPeople >= this.headcount &&
-				this.roomInfo.maxPeople < 7
+				this.roomInfo.maxPeople < 9
 			) {
 				socket.emit('maxPeople', ROOM_ID, this.roomInfo.maxPeople);
-				console.log('emit');
 			} else {
 				this.roomInfo.maxPeople = this.headcount;
 			}
@@ -162,19 +166,23 @@ myPeer.on('open', id => {
 	vm.$data.userId = id;
 	vm.$data.userEmail = getParameterByName('userEmail');
 	socket.emit('email', id, vm.$data.userEmail);
-	// if (vm.$data.userEmail !== '') {
-	// 	getUserInfo();
-	// 	getRoomInfo();
-	// }
-	//가져온 방 정보를 기준으로 확인
-	socket.emit('check-room', ROOM_ID);
+	loadData();
 });
+
+async function loadData() {
+	if (vm.$data.userEmail !== '') {
+		await getUserInfo();
+		await getRoomInfo();
+	}
+	document.title = vm.$data.roomInfo.title;
+	socket.emit('check-room', ROOM_ID);
+}
 
 //연결을 요청하는 곳에서 받는 call
 myPeer.on('call', call => {
 	navigator.mediaDevices
 		.getUserMedia({ video: true, audio: true })
-		.then(function (stream) {
+		.then(stream => {
 			if (typeof localStream === 'undefined') {
 				localStream = stream;
 			}
@@ -191,12 +199,11 @@ myPeer.on('error', e => {
 });
 
 socket.on('set-clubhouse', () => {
-	if (!vm.$data.power) {
-		document
-			.getElementById('local')
-			.srcObject.getAudioTracks()[0].enabled = false;
-		document.getElementById('audio_btn').style.display = 'none';
-	}
+	onClubHouseMode();
+});
+
+socket.on('remove-clubhouse', () => {
+	offClubHouseMode();
 });
 
 socket.on('set-voice', userId => {
@@ -223,7 +230,7 @@ socket.on('set-power', power => {
 
 socket.on('retire-user', userId => {
 	if (userId === vm.$data.userId) {
-		window.location.href = 'https://naver.com';
+		window.location.href = 'http://192.168.35.115:8081/waittingroom';
 	}
 });
 
@@ -255,7 +262,6 @@ socket.on('user-disconnected', userId => {
 		vm.$data.headcount--;
 		socket.emit('power', ROOM_ID, vm.$data.userId);
 		//exit
-		console.log(1);
 	}
 });
 
@@ -269,38 +275,36 @@ socket.on('user-connected', newUserId => {
 	setCall(callUser, newUserId);
 });
 
-socket.on('enter-room', (password, maxPeople, clients) => {
+socket.on('enter-room', (password, clients) => {
 	if (password) {
 		//비밀번호가 있는 경우
 		let returnValue = prompt('비밀번호를 입력하세요');
 		if (returnValue === password) {
 			//비밀번호가 맞은 경우
 			if (clients) {
-				//방인원제한이 있는 경우
-				if (clients.length < maxPeople) {
-					console.log(clients.length, maxPeople);
+				console.log(clients);
+				if (clients.length < vm.$data.roomInfo.maxPeople) {
 					socket.emit('join-room', ROOM_ID, vm.$data.userId);
 				} else {
 					alert('Room ' + ROOM_ID + ' is full');
-					window.location.href = 'https://naver.com';
+					window.location.href = document.referrer;
 				}
 			} else {
-				//방인원제한이 없는 경우
 				socket.emit('join-room', ROOM_ID, vm.$data.userId);
 			}
 		} else {
 			//비밀번호가 틀린 경우
 			alert('비밀번호가 틀렸습니다.');
-			window.location.href = 'https://naver.com';
+			window.location.href = document.referrer;
 		}
 	} else {
 		//비밀번호가 없는 경우
 		if (clients) {
-			if (clients.length < maxPeople) {
+			if (clients.length < vm.$data.roomInfo.maxPeople) {
 				socket.emit('join-room', ROOM_ID, vm.$data.userId);
 			} else {
 				alert('Room ' + ROOM_ID + ' is full');
-				window.location.href = 'https://naver.com';
+				window.location.href = document.referrer;
 			}
 		} else {
 			socket.emit('join-room', ROOM_ID, vm.$data.userId);
@@ -318,16 +322,12 @@ function handleSuccess(stream) {
 	localScreenStream = stream;
 	//for문으로 모든 유저한테 공유하기
 	makeScreenCall(stream);
-	stream.getdocument
-		.getElementById('local')
-		.srcObject.getVideoTracks()[0]
-		.enableds()[0]
-		.addEventListener('ended', () => {
-			startButton.disabled = false;
-			video.srcObject = localStream;
-			makeScreenCall(localStream);
-			errorMsg('The user has ended sharing the screen');
-		});
+	stream.getVideoTracks()[0].addEventListener('ended', () => {
+		startButton.disabled = false;
+		video.srcObject = localStream;
+		makeScreenCall(localStream);
+		errorMsg('The user has ended sharing the screen');
+	});
 }
 
 function makeScreenCall(stream) {
@@ -399,11 +399,11 @@ function getParameterByName(name) {
 }
 
 //스프링과 통신
-function sendRoomData(roomInfo) {
+function sendRoomData() {
 	axios
 		.post(
 			`http://localhost:80/changeroominfo`,
-			JSON.stringify(vm.$data.testRoom),
+			JSON.stringify(vm.$data.roomInfo),
 			{
 				headers: { 'Content-Type': `application/json` },
 			}
@@ -417,15 +417,15 @@ function sendRoomData(roomInfo) {
 		});
 }
 let e;
-function getRoomInfo() {
-	axios
+async function getRoomInfo() {
+	await axios
 		.get(`http://localhost:80/room/${ROOM_ID}`, {
 			headers: { 'Access-Control-Allow-Origin': '*' },
 		})
 		.then(response => {
+			console.log('getroom');
 			e = response.data;
-			console.log(e);
-			vm.$data.testRoom = response.data;
+			vm.$data.roomInfo = response.data;
 		})
 		.catch(e => {
 			console.log(e);
@@ -433,8 +433,8 @@ function getRoomInfo() {
 		});
 }
 
-function getUserInfo() {
-	axios
+async function getUserInfo() {
+	await axios
 		.get(`http://localhost:80/user/${vm.$data.userEmail}`, {
 			headers: { 'Access-Control-Allow-Origin': '*' },
 		})
@@ -455,14 +455,12 @@ function addVideoStream(video, stream, userId) {
 	const div = document.createElement('div');
 	if (video.id !== 'local') {
 		const powerBtn = document.createElement('button');
-		const reportBtn = document.createElement('button');
 		const retireBtn = document.createElement('button');
 		const remoteAudioBtn = document.createElement('button');
 		const remoteVideoBtn = document.createElement('button');
 		const voiceBtn = document.createElement('button');
 
 		video.id = userId;
-		reportBtn.id = 'click';
 		voiceBtn.className = 'voice';
 		powerBtn.className = 'power';
 		retireBtn.className = 'power';
@@ -471,7 +469,6 @@ function addVideoStream(video, stream, userId) {
 
 		voiceBtn.innerHTML = '발언권';
 		powerBtn.innerHTML = '방장';
-		reportBtn.innerHTML = '신고';
 		retireBtn.innerHTML = '강퇴';
 		remoteAudioBtn.innerHTML = '오디오';
 		remoteVideoBtn.innerHTML = '비디오';
@@ -488,26 +485,6 @@ function addVideoStream(video, stream, userId) {
 			if (returnValue) {
 				socket.emit('power', ROOM_ID, userId);
 				vm.$data.power = false;
-			}
-		};
-		reportBtn.onclick = () => {
-			let returnValue = confirm('신고하시겠습니까?');
-			if (returnValue) {
-				returnValue = prompt('신고할 내용을 입력하세요.');
-				axios
-					.post(
-						`http://localhost:80/report/${vm.$data.userEmail}`,
-						JSON.stringify({ report: returnValue }),
-						{
-							headers: { 'Content-Type': `application/json` },
-						}
-					)
-					.then(message => {
-						alert(message);
-					})
-					.catch(() => {
-						alert('신고 제출중 문제가 발생했습니다.');
-					});
 			}
 		};
 		retireBtn.onclick = () => {
@@ -528,11 +505,15 @@ function addVideoStream(video, stream, userId) {
 			retireBtn.style.display = 'none';
 			remoteAudioBtn.style.display = 'none';
 			remoteVideoBtn.style.display = 'none';
+		} else {
+			if (vm.$data.roomInfo.theme !== '클럽하우스') {
+				voiceBtn.style.display = 'none';
+			} else {
+				voiceBtn.style.display = 'inline-block';
+			}
 		}
-		voiceBtn.style.display = 'none';
 
 		div.append(video);
-		div.append(reportBtn);
 		div.append(powerBtn);
 		div.append(retireBtn);
 		div.append(voiceBtn);
@@ -544,18 +525,50 @@ function addVideoStream(video, stream, userId) {
 
 	video.addEventListener('dblclick', () => {
 		if (videoFocus) {
-			alert(userId);
 			div.remove();
 			videoGrid.style.display = 'none';
 			let focus = document.getElementById('focus');
 			focus.append(div);
-			focus.style.width = '100vw';
-			focus.style.height = '100vh';
+			focus.style.display = 'inline-block';
+			videoFocus = !videoFocus;
+		} else {
+			div.remove();
+			document.getElementById('focus').style.display = 'none';
+			videoGrid.style.display = 'grid';
+			videoGrid.append(div);
+			videoFocus = !videoFocus;
 		}
 	});
 
+	timer = document.createElement('div');
+	timer.setAttribute('name', userId);
+	timer.className = 'timer';
+	div.append(timer);
 	videoGrid.append(div);
 	return div;
+}
+
+function onClubHouseMode() {
+	if (!vm.$data.power) {
+		document
+			.getElementById('local')
+			.srcObject.getAudioTracks()[0].enabled = false;
+		document.getElementById('audio_btn').style.display = 'none';
+	} else {
+		document.getElementById('offClubHouseMode_btn').disabled = false;
+	}
+}
+
+function offClubHouseMode() {
+	if (!vm.$data.power) {
+		document.getElementById('audio_btn').style.display = 'inline-block';
+	} else {
+		document.getElementById('offClubHouseMode_btn').disabled = true;
+		let voiceBtns = document.getElementsByClassName('voice');
+		for (let i = 0; i < voiceBtns.length; i++) {
+			voiceBtns[i].style.display = 'none';
+		}
+	}
 }
 
 //방설정 버튼
@@ -610,9 +623,9 @@ myPeer.on('connection', con => {
 
 send.onclick = () => {
 	if (vm.$data.chatting.replace(/\s+/g, '') !== '') {
-		chat.innerHTML += vm.$data.chatting + `\n`;
+		chat.innerHTML += vm.$data.userInfo.id + ': ' + vm.$data.chatting + `\n`;
 		for (const key in connectionList) {
-			connectionList[key].send(vm.$data.chatting);
+			connectionList[key].send(vm.$data.userInfo.id + ': ' + vm.$data.chatting);
 		}
 	}
 	vm.$data.chatting = '';
@@ -655,8 +668,6 @@ audio_btn.onclick = () => {
 
 //나갈 때 스프링으로 통신
 exit_btn.onclick = () => {
-	//window.location.href = `http://192.168.35.115:80/exitroom/room/${roomid}/user/${userEmail}/
-	//get방식
 	axios
 		.get(
 			`http://localhost:80/exitroom/room/${ROOM_ID}/user/${vm.$data.userEmail}`
@@ -670,29 +681,71 @@ exit_btn.onclick = () => {
 };
 
 //타이머
-const timer = document.getElementById('timer');
-let countStatus = false;
-let timeInterval;
+let countStatus = true;
+let timeIntervalList = {};
+let timeList = {};
+let minList = {};
+let secList = {};
 let time = 0;
 let min = 0;
 let sec = 0;
 
-countup_btn.onclick = () => {
+function countUp(userId) {
 	vm.$data.time = 0;
-	countStatus = !countStatus;
 	if (countStatus) {
-		timeInterval = setInterval(() => {
-			min = parseInt(time / 60);
-			sec = time % 60;
-			timer.innerHTML = min + '분' + sec + '초';
-			time++;
+		if (typeof timeList[userId] === 'undefined') {
+			timeList[userId] = 0;
+			minList[userId] = 0;
+			secList[userId] = 0;
+		}
+		timeIntervalList[userId] = setInterval(() => {
+			minList[userId] = parseInt(timeList[userId] / 60);
+			secList[userId] = timeList[userId] % 60;
+			document.getElementsByName(userId)[0].innerHTML =
+				minList[userId] + '분' + secList[userId] + '초';
+			timeList[userId]++;
 		}, 1000);
+		countStatus = !countStatus;
 	} else {
-		clearInterval(timeInterval);
+		clearInterval(timeIntervalList[userId]);
+		countStatus = !countStatus;
+	}
+}
+
+socket.on('set-countUp', userId => {
+	if (typeof timeList[userId] === 'undefined') {
+		timeList[userId] = 0;
+		minList[userId] = 0;
+		secList[userId] = 0;
+	}
+	timeIntervalList[userId] = setInterval(() => {
+		minList[userId] = parseInt(timeList[userId] / 60);
+		secList[userId] = timeList[userId] % 60;
+		document.getElementsByName(userId)[0].innerHTML =
+			minList[userId] + '분' + secList[userId] + '초';
+		timeList[userId]++;
+	}, 1000);
+	console.log(timeIntervalList[userId]);
+});
+
+socket.on('remove-countUp', userId => {
+	console.log(timeIntervalList[userId]);
+	clearInterval(timeIntervalList[userId]);
+});
+
+let sendStatus = true;
+countup_btn.onclick = () => {
+	countUp(vm.$data.userId);
+	if (sendStatus) {
+		socket.emit('on-countUp', ROOM_ID, vm.$data.userId);
+		sendStatus = !sendStatus;
+	} else {
+		socket.emit('off-countUp', ROOM_ID, vm.$data.userId);
+		sendStatus = !sendStatus;
 	}
 };
 
-countdown_btn.onclick = () => {
+function countDown(userId) {
 	vm.$data.time = Number(vm.$data.time);
 	if (vm.$data.time > 0) {
 		time = vm.$data.time * 60;
@@ -700,34 +753,48 @@ countdown_btn.onclick = () => {
 	vm.$data.time = 0;
 	countStatus = !countStatus;
 	if (countStatus) {
-		timeInterval = setInterval(() => {
+		timeIntervalList[userId] = setInterval(() => {
 			min = parseInt(time / 60);
 			sec = time % 60;
 			timer.innerHTML = min + '분' + sec + '초';
 			time--;
 			if (time < 0) {
-				clearInterval(timeInterval);
+				clearInterval(timeIntervalList[userId]);
 				alert('시간이 초과되었습니다.');
 			}
 		}, 1000);
 	} else {
-		clearInterval(timeInterval);
+		clearInterval(timeIntervalList[userId]);
 	}
+}
+countdown_btn.onclick = () => {
+	countDown(vm.$data.userId);
 };
 
-countreset_btn.onclick = () => {
-	clearInterval(timeInterval);
+function resetCount(userId) {
+	clearInterval(timeIntervalList[userId]);
+	time = 0;
+	min = 0;
+	sec = 0;
 	timer.innerHTML = '';
+}
+countreset_btn.onclick = () => {
+	resetCount(vm.$data.userId);
 };
 
-// function doNotReload() {
-// 	if (
-// 		(event.ctrlKey == true && (event.keyCode == 78 || event.keyCode == 82)) ||
-// 		event.keyCode == 116
-// 	) {
-// 		event.keyCode = 0;
-// 		event.cancelBubble = true;
-// 		event.returnValue = false;
-// 	}
-// }
-// document.onkeydown = doNotReload;
+offClubHouseMode_btn.onclick = () => {
+	socket.emit('off-clubhouse', ROOM_ID);
+	offClubHouseMode();
+};
+
+function doNotReload() {
+	if (
+		(event.ctrlKey == true && (event.keyCode == 78 || event.keyCode == 82)) ||
+		event.keyCode == 116
+	) {
+		event.keyCode = 0;
+		event.cancelBubble = true;
+		event.returnValue = false;
+	}
+}
+document.onkeydown = doNotReload;
