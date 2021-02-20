@@ -15,9 +15,6 @@ video {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
-	/* transform: rotateY(180deg);
-	-webkit-transform: rotateY(180deg);
-	-moz-transform: rotateY(180deg); */
 }
 
 /*팝업 부분*/
@@ -62,7 +59,7 @@ video {
 }
 
 /*버튼들 위치*/
-.power,
+.host,
 .voice,
 #click {
 	position: relative;

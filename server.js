@@ -2,7 +2,6 @@ const fs = require('fs');
 const express = require('express');
 const app = express();
 const https = require('https');
-const { v4: uuidV4 } = require('uuid');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const axios = require('axios');
@@ -35,8 +34,7 @@ const io = require('socket.io')(server);
 
 //서버운영중 필요한 데이터들
 const passwordList = {};
-const powerList = {};
-const maxPeopleList = {};
+const hostList = {};
 const emailList = {};
 
 io.on('connection', socket => {
@@ -57,8 +55,8 @@ io.on('connection', socket => {
 
 		//방에 처음 들어가는거면 방장 권한 줌
 		if (numClients === 0) {
-			powerList[roomId] = userId;
-			socket.emit('set-power', powerList[roomId]);
+			hostList[roomId] = userId;
+			socket.emit('set-host', hostList[roomId]);
 		}
 
 		socket.join(roomId);
@@ -74,9 +72,17 @@ io.on('connection', socket => {
 				.catch(error => {
 					console.log(error);
 				});
+
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
+
 			if (io.engine.clientsCount === 0) {
 				delete passwordList[roomId];
+				delete hostList[roomId];
+			}
+
+			if (hostList[roomId] === userId) {
+				delete hostList[roomId];
+				socket.to(roomId).broadcast.emit('host-disconnected');
 			}
 		});
 	});
@@ -91,14 +97,17 @@ io.on('connection', socket => {
 		socket.to(roomId).broadcast.emit('set-title', title);
 	});
 
-	socket.on('maxPeople', (roomId, headcountLimit) => {
-		maxPeopleList[roomId] = headcountLimit;
+	socket.on('host', (roomId, userId) => {
+		hostList[roomId] = userId;
+		socket.emit('set-host', hostList[roomId]);
+		socket.to(roomId).broadcast.emit('set-host', hostList[roomId]);
 	});
 
-	socket.on('power', (roomId, power) => {
-		powerList[roomId] = power;
-		socket.emit('set-power', powerList[roomId]);
-		socket.to(roomId).broadcast.emit('set-power', powerList[roomId]);
+	socket.on('host-reset', (roomId, userId) => {
+		if (typeof hostList[roomId] === 'undefined') {
+			hostList[roomId] = userId;
+			socket.emit('set-host', hostList[roomId]);
+		}
 	});
 
 	//강퇴
