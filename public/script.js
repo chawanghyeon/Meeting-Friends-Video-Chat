@@ -15,11 +15,11 @@ let videoFocus = true;
 let videoStatus = true;
 let audioStatus = true;
 myVideo.muted = true;
+myVideo.id = 'local';
 let timer;
 let localStream;
 let localScreenStream;
 let myPeer;
-myVideo.id = 'local';
 
 navigator.mediaDevices
 	.getUserMedia({ video: true, audio: true })
@@ -239,6 +239,10 @@ socket.on('remove-count', userId => {
 
 socket.on('host-disconnected', () => {
 	socket.emit('host-reset', ROOM_ID, vm.$data.userId);
+});
+
+socket.on('alert-userInfo', userEmail => {
+	alertUserInfo(userEmail);
 });
 
 //방설정 버튼
@@ -611,6 +615,7 @@ function addVideoStream(video, stream, userId) {
 				socket.emit('voice', ROOM_ID, userId);
 			}
 		};
+
 		hostBtn.onclick = () => {
 			let returnValue = confirm('방장권한을 넘기시겠습니까?');
 			if (returnValue) {
@@ -618,18 +623,22 @@ function addVideoStream(video, stream, userId) {
 				vm.$data.host = false;
 			}
 		};
+
 		retireBtn.onclick = () => {
 			let returnValue = confirm('강퇴하시겠습니까?');
 			if (returnValue) {
 				socket.emit('retire', ROOM_ID, userId);
 			}
 		};
+
 		remoteAudioBtn.onclick = () => {
 			socket.emit('audio', ROOM_ID, userId);
 		};
+
 		remoteVideoBtn.onclick = () => {
 			socket.emit('video', ROOM_ID, userId);
 		};
+
 		//방장인 경우만 버튼 표시
 		if (!vm.$data.host) {
 			hostBtn.style.display = 'none';
@@ -671,6 +680,10 @@ function addVideoStream(video, stream, userId) {
 		}
 	});
 
+	video.addEventListener('contextmenu', () => {
+		socket.emit('userInfo', userId);
+	});
+
 	timer = document.createElement('div');
 	timer.setAttribute('name', userId);
 	timer.className = 'timer';
@@ -678,6 +691,16 @@ function addVideoStream(video, stream, userId) {
 	div.append(timer);
 	videoGrid.append(div);
 	return div;
+}
+
+function alertUserInfo(userEmail) {
+	for (let i = 0; i < vm.$data.roomInfo.roommember.length; i++) {
+		if (vm.$data.roomInfo.roommember[i].id === userEmail) {
+			let temp = vm.$data.roomInfo.roommember[i];
+			alert(`닉네임 : ${temp.nickname} 성별 : ${temp.gender}`);
+			break;
+		}
+	}
 }
 
 function onClubHouseMode() {
@@ -718,22 +741,20 @@ function resetCount(userId) {
 }
 
 function countUp(userId) {
-	vm.$data.time = 0;
 	if (countStatus) {
 		socket.emit('on-countUp', ROOM_ID, vm.$data.userId);
 
 		if (typeof timeList[userId] === 'undefined') {
 			timeList[userId] = 0;
-			minList[userId] = 0;
-			secList[userId] = 0;
 		}
 
 		timeIntervalList[userId] = setInterval(() => {
 			minList[userId] = parseInt(timeList[userId] / 60);
 			secList[userId] = timeList[userId] % 60;
 
-			document.getElementsByName(userId)[0].innerHTML =
-				minList[userId] + '분' + secList[userId] + '초';
+			document.getElementsByName(
+				userId
+			)[0].innerHTML = `${minList[userId]}분 ${secList[userId]}초`;
 			timeList[userId]++;
 		}, 1000);
 		countStatus = !countStatus;
@@ -746,34 +767,29 @@ function countUp(userId) {
 
 function countDown(userId) {
 	if (countStatus) {
-		socket.emit('on-countDown', ROOM_ID, vm.$data.userId);
-
-		if (typeof timeList[userId] === 'undefined') {
-			timeList[userId] = 0;
-			minList[userId] = 0;
-			secList[userId] = 0;
-		}
-
-		vm.$data.time = Number(vm.$data.time);
 		if (vm.$data.time > 0) {
+			socket.emit('on-countDown', ROOM_ID, vm.$data.userId, vm.$data.time);
+
+			vm.$data.time = Number(vm.$data.time);
 			timeList[userId] = vm.$data.time * 60;
+			vm.$data.time = 0;
+
+			timeIntervalList[userId] = setInterval(() => {
+				minList[userId] = parseInt(timeList[userId] / 60);
+				secList[userId] = timeList[userId] % 60;
+
+				document.getElementsByName(
+					userId
+				)[0].innerHTML = `${minList[userId]}분 ${secList[userId]}초`;
+				timeList[userId]--;
+
+				if (timeList[userId] < 0) {
+					clearInterval(timeIntervalList[userId]);
+					alert('시간이 초과되었습니다.');
+				}
+			}, 1000);
+			countStatus = !countStatus;
 		}
-		vm.$data.time = 0;
-
-		timeIntervalList[userId] = setInterval(() => {
-			minList[userId] = parseInt(timeList[userId] / 60);
-			secList[userId] = timeList[userId] % 60;
-
-			document.getElementsByName(userId)[0].innerHTML =
-				minList[userId] + '분' + secList[userId] + '초';
-			timeList[userId]--;
-
-			if (timeList[userId] < 0) {
-				clearInterval(timeIntervalList[userId]);
-				alert('시간이 초과되었습니다.');
-			}
-		}, 1000);
-		countStatus = !countStatus;
 	} else {
 		clearInterval(timeIntervalList[userId]);
 		socket.emit('off-count', ROOM_ID, vm.$data.userId);
@@ -874,24 +890,19 @@ function onAudio() {
 function setRemoteCountUp(userId) {
 	if (typeof timeList[userId] === 'undefined') {
 		timeList[userId] = 0;
-		minList[userId] = 0;
-		secList[userId] = 0;
 	}
 	timeIntervalList[userId] = setInterval(() => {
 		minList[userId] = parseInt(timeList[userId] / 60);
 		secList[userId] = timeList[userId] % 60;
-		document.getElementsByName(userId)[0].innerHTML =
-			minList[userId] + '분' + secList[userId] + '초';
+
+		document.getElementsByName(
+			userId
+		)[0].innerHTML = `${minList[userId]}분 ${secList[userId]}초`;
 		timeList[userId]++;
 	}, 1000);
 }
 
 function setRemoteCountDown(userId) {
-	if (typeof timeList[userId] === 'undefined') {
-		timeList[userId] = 0;
-		minList[userId] = 0;
-		secList[userId] = 0;
-	}
 	vm.$data.time = Number(vm.$data.time);
 	if (vm.$data.time > 0) {
 		timeList[userId] = vm.$data.time * 60;
@@ -901,8 +912,9 @@ function setRemoteCountDown(userId) {
 	timeIntervalList[userId] = setInterval(() => {
 		minList[userId] = parseInt(timeList[userId] / 60);
 		secList[userId] = timeList[userId] % 60;
-		document.getElementsByName(userId)[0].innerHTML =
-			minList[userId] + '분' + secList[userId] + '초';
+		document.getElementsByName(
+			userId
+		)[0].innerHTML = `${minList[userId]}분 ${secList[userId]}초`;
 		timeList[userId]--;
 		if (timeList[userId] < 0) {
 			clearInterval(timeIntervalList[userId]);

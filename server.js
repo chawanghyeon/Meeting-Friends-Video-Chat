@@ -1,15 +1,15 @@
 const fs = require('fs');
 const express = require('express');
-const app = express();
 const https = require('https');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 const axios = require('axios');
+const app = express();
+const passwordList = {};
+const hostList = {};
+const emailList = {};
 
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 
 app.get('/room/:room', (req, res) => {
@@ -32,11 +32,6 @@ server = https.createServer(
 );
 const io = require('socket.io')(server);
 
-//서버운영중 필요한 데이터들
-const passwordList = {};
-const hostList = {};
-const emailList = {};
-
 io.on('connection', socket => {
 	//클라이언트가 맨처음 로딩 시 방에 대해서 체크
 	socket.on('check-room', roomId => {
@@ -56,7 +51,7 @@ io.on('connection', socket => {
 		//방에 처음 들어가는거면 방장 권한 줌
 		if (numClients === 0) {
 			hostList[roomId] = userId;
-			socket.emit('set-host', hostList[roomId]);
+			socket.emit('set-host', userId);
 		}
 
 		socket.join(roomId);
@@ -64,25 +59,20 @@ io.on('connection', socket => {
 
 		//연결이 끊어졌을 때
 		socket.on('disconnect', () => {
-			axios
-				.get(
-					`http://localhost:80/exitroom/room/${roomId}/user/${emailList[userId]}`
-				)
-				.then(() => {})
-				.catch(error => {
-					console.log(error);
-				});
+			axios.get(
+				`http://localhost:80/exitroom/room/${roomId}/user/${emailList[userId]}`
+			);
 
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
-
-			if (io.engine.clientsCount === 0) {
-				delete passwordList[roomId];
-				delete hostList[roomId];
-			}
 
 			if (hostList[roomId] === userId) {
 				delete hostList[roomId];
 				socket.to(roomId).broadcast.emit('host-disconnected');
+			}
+
+			if (io.engine.clientsCount === 0) {
+				delete passwordList[roomId];
+				delete hostList[roomId];
 			}
 		});
 	});
@@ -158,6 +148,10 @@ io.on('connection', socket => {
 
 	socket.on('reset-count', (roomId, userId) => {
 		socket.to(roomId).broadcast.emit('remove-count', userId);
+	});
+
+	socket.on('userInfo', userId => {
+		socket.emit('alert-userInfo', emailList[userId]);
 	});
 });
 
