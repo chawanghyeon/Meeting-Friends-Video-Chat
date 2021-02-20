@@ -139,8 +139,16 @@ io.on('connection', socket => {
 		socket.to(roomId).broadcast.emit('set-countUp', userId);
 	});
 
-	socket.on('off-countUp', (roomId, userId) => {
-		socket.to(roomId).broadcast.emit('remove-countUp', userId);
+	socket.on('on-countDown', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('set-countDown', userId);
+	});
+
+	socket.on('off-count', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('stop-count', userId);
+	});
+
+	socket.on('reset-count', (roomId, userId) => {
+		socket.to(roomId).broadcast.emit('remove-count', userId);
 	});
 });
 

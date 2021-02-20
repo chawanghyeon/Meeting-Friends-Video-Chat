@@ -96,7 +96,6 @@ const vm = new Vue({
 		setRoom: function (data) {
 			if (
 				data.title.value !== '' &&
-				data.pw.value !== '' &&
 				data.maxPeople.value !== '' &&
 				data.theme.value !== ''
 			) {
@@ -686,9 +685,6 @@ let timeIntervalList = {};
 let timeList = {};
 let minList = {};
 let secList = {};
-let time = 0;
-let min = 0;
-let sec = 0;
 
 function countUp(userId) {
 	vm.$data.time = 0;
@@ -725,12 +721,42 @@ socket.on('set-countUp', userId => {
 			minList[userId] + '분' + secList[userId] + '초';
 		timeList[userId]++;
 	}, 1000);
-	console.log(timeIntervalList[userId]);
 });
 
-socket.on('remove-countUp', userId => {
-	console.log(timeIntervalList[userId]);
+socket.on('set-countDown', userId => {
+	if (typeof timeList[userId] === 'undefined') {
+		timeList[userId] = 0;
+		minList[userId] = 0;
+		secList[userId] = 0;
+	}
+	vm.$data.time = Number(vm.$data.time);
+	if (vm.$data.time > 0) {
+		timeList[userId] = vm.$data.time * 60;
+	}
+	vm.$data.time = 0;
+	countStatus = !countStatus;
+	timeIntervalList[userId] = setInterval(() => {
+		minList[userId] = parseInt(timeList[userId] / 60);
+		secList[userId] = timeList[userId] % 60;
+		document.getElementsByName(userId)[0].innerHTML =
+			minList[userId] + '분' + secList[userId] + '초';
+		timeList[userId]--;
+		if (timeList[userId] < 0) {
+			clearInterval(timeIntervalList[userId]);
+		}
+	}, 1000);
+});
+
+socket.on('stop-count', userId => {
 	clearInterval(timeIntervalList[userId]);
+});
+
+socket.on('remove-count', userId => {
+	clearInterval(timeIntervalList[userId]);
+	timeList[userId] = 0;
+	minList[userId] = 0;
+	secList[userId] = 0;
+	document.getElementsByName(userId)[0].innerHTML = '';
 });
 
 let sendStatus = true;
@@ -740,43 +766,58 @@ countup_btn.onclick = () => {
 		socket.emit('on-countUp', ROOM_ID, vm.$data.userId);
 		sendStatus = !sendStatus;
 	} else {
-		socket.emit('off-countUp', ROOM_ID, vm.$data.userId);
+		socket.emit('off-count', ROOM_ID, vm.$data.userId);
 		sendStatus = !sendStatus;
 	}
 };
 
 function countDown(userId) {
-	vm.$data.time = Number(vm.$data.time);
-	if (vm.$data.time > 0) {
-		time = vm.$data.time * 60;
-	}
-	vm.$data.time = 0;
-	countStatus = !countStatus;
 	if (countStatus) {
+		if (typeof timeList[userId] === 'undefined') {
+			timeList[userId] = 0;
+			minList[userId] = 0;
+			secList[userId] = 0;
+		}
+		vm.$data.time = Number(vm.$data.time);
+		if (vm.$data.time > 0) {
+			timeList[userId] = vm.$data.time * 60;
+		}
+		vm.$data.time = 0;
+		countStatus = !countStatus;
 		timeIntervalList[userId] = setInterval(() => {
-			min = parseInt(time / 60);
-			sec = time % 60;
-			timer.innerHTML = min + '분' + sec + '초';
-			time--;
-			if (time < 0) {
+			minList[userId] = parseInt(timeList[userId] / 60);
+			secList[userId] = timeList[userId] % 60;
+			document.getElementsByName(userId)[0].innerHTML =
+				minList[userId] + '분' + secList[userId] + '초';
+			timeList[userId]--;
+			if (timeList[userId] < 0) {
 				clearInterval(timeIntervalList[userId]);
 				alert('시간이 초과되었습니다.');
 			}
 		}, 1000);
 	} else {
 		clearInterval(timeIntervalList[userId]);
+		countStatus = !countStatus;
 	}
 }
 countdown_btn.onclick = () => {
 	countDown(vm.$data.userId);
+	if (sendStatus) {
+		socket.emit('on-countDown', ROOM_ID, vm.$data.userId);
+		sendStatus = !sendStatus;
+	} else {
+		socket.emit('off-count', ROOM_ID, vm.$data.userId);
+		sendStatus = !sendStatus;
+	}
 };
 
 function resetCount(userId) {
 	clearInterval(timeIntervalList[userId]);
-	time = 0;
-	min = 0;
-	sec = 0;
-	timer.innerHTML = '';
+	timeList[userId] = 0;
+	minList[userId] = 0;
+	secList[userId] = 0;
+	document.getElementsByName(userId)[0].innerHTML = '';
+	socket.emit('reset-count', ROOM_ID, userId);
 }
 countreset_btn.onclick = () => {
 	resetCount(vm.$data.userId);
