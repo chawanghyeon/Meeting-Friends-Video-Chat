@@ -68,10 +68,10 @@ video {
 }
 
 button {
-  padding: 10px;
-  width: 110px;
-  height: 50px;
-  margin: 2px;
+	padding: 10px;
+	width: 110px;
+	height: 50px;
+	margin: 2px;
 }
 
 .header {
@@ -88,14 +88,18 @@ button {
 .voice,
 #click {
 	position: relative;
-	top: -300px;
+	top: -405px;
+	width: 50px;
+	height: 30px;
+	margin: 0px;
+	padding: 0px;
 }
 
 /*화면 고정*/
 #focus {
 	display: none;
 	width: 60%;
-  margin: 0px auto;
+	margin: 0px auto;
 	height: 60%;
 }
 .logo {
@@ -188,21 +192,24 @@ h1 {
 	text-shadow: 0px 1px 0px #9752cc;
 }
 .offClubHouseMode_btn {
-	margin-top: 10px;
-	box-shadow: inset 0px 1px 0px 0px #efdcfb;
-	background: linear-gradient(to bottom, #dfbdfa 5%, #bc80ea 100%);
-	background-color: #dfbdfa;
-	border-radius: 6px;
-	border: 1px solid #c584f3;
-	display: inline-block;
-	cursor: pointer;
-	color: #ffffff;
-	font-family: Arial;
-	font-size: 15px;
-	font-weight: bold;
-	padding: 6px 24px;
-	text-decoration: none;
-	text-shadow: 0px 1px 0px #9752cc;
+  height: 35px;
+  width: 194px;
+  box-shadow: inset 0px 1px 0px 0px #efdcfb;
+  background: linear-gradient(to bottom, #dfbdfa 5%, #bc80ea 100%);
+  background-color: #dfbdfa;
+  border-radius: 6px;
+  border: 1px solid #b05bec;
+  cursor: pointer;
+  color: white;
+  font-family: Arial;
+  font-size: 15px;
+  font-weight: bold;
+  text-decoration: none;
+  margin: 0px;
+  padding: 0px;
+  position: relative;
+  left: 192px;
+  text-shadow: 0px 1px 0px #9752cc;
 }
 .send {
 	box-shadow: inset 0px 1px 0px 0px #efdcfb;
@@ -223,10 +230,35 @@ h1 {
 input {
 	margin-left: 10px;
 	margin-top: 10px;
-	margin-bottom: 25px;
+	margin-bottom: 10px;
 	padding: 10px;
 	border: 3px solid #b7abc0;
 	border-radius: 0px;
 	height: 30px;
 	width: 300px;
+}
+#theme {
+	width: 200px; /* 원하는 너비설정 */
+	padding: 0.8em 0.5em; /* 여백으로 높이 설정 */
+	font-family: inherit; /* 폰트 상속 */
+	background: url(https://farm1.staticflickr.com/379/19928272501_4ef877c265_t.jpg)
+		no-repeat 95% 50%; /* 네이티브 화살표 대체 */
+	border: 1px solid #999;
+	border-radius: 0px; /* iOS 둥근모서리 제거 */
+	-webkit-appearance: none; /* 네이티브 외형 감추기 */
+	-moz-appearance: none;
+	appearance: none;
+	position: relative;
+	left: 35px;
+}
+#title {
+	left: 13px;
+	position: relative;
+}
+.reset_btn,
+.submit_btn {
+	width: 55px;
+	height: 40px;
+	position: relative;
+	left: 35px;
 }

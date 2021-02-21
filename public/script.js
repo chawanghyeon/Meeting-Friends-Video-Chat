@@ -119,7 +119,8 @@ const vm = new Vue({
 					for (let i = 0; i < voiceBtns.length; i++) {
 						voiceBtns[i].style.display = 'inline-block';
 					}
-					document.getElementById('offClubHouseMode_btn').disabled = false;
+					document.getElementById('offClubHouseMode_btn').style.display =
+						'block';
 					document.getElementById('audio_btn').style.display = 'inline-block';
 				} else {
 					let voiceBtns = document.getElementsByClassName('voice');
@@ -127,6 +128,8 @@ const vm = new Vue({
 						voiceBtns[i].style.display = 'none';
 					}
 				}
+			} else {
+				document.getElementById('offClubHouseMode_btn').style.display = 'none';
 			}
 		},
 	},
@@ -708,9 +711,6 @@ function onClubHouseMode() {
 		document
 			.getElementById('local')
 			.srcObject.getAudioTracks()[0].enabled = false;
-		document.getElementById('audio_btn').style.display = 'none';
-	} else {
-		document.getElementById('offClubHouseMode_btn').disabled = false;
 	}
 }
 
@@ -721,7 +721,6 @@ function offClubHouseMode() {
 		vm.$data.roomInfo.theme = '수다방';
 		sendRoomData();
 
-		document.getElementById('offClubHouseMode_btn').disabled = true;
 		let voiceBtns = document.getElementsByClassName('voice');
 		for (let i = 0; i < voiceBtns.length; i++) {
 			voiceBtns[i].style.display = 'none';
