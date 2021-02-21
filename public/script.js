@@ -669,7 +669,7 @@ function addVideoStream(video, stream, userId) {
 			videoGrid.style.display = 'none';
 			let focus = document.getElementById('focus');
 			focus.append(div);
-			focus.style.display = 'inline-block';
+			focus.style.display = 'block';
 			videoFocus = !videoFocus;
 		} else {
 			div.remove();

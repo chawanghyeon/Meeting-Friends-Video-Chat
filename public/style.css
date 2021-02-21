@@ -7,8 +7,10 @@ zbody {
 /*비디오 부분*/
 #video-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, 300px);
-	grid-auto-rows: 300px;
+	padding: 50px;
+	justify-content: space-between;
+	grid-template-columns: repeat(auto-fill, 400px);
+	grid-auto-rows: 400px;
 }
 
 video {
@@ -21,12 +23,12 @@ video {
 .modal_wrap {
 	display: none;
 	width: 500px;
-	height: 500px;
+	height: 400px;
 	position: absolute;
 	top: 50%;
 	left: 50%;
 	margin: -250px 0 0 -250px;
-	background: #eee;
+	background: rgb(236, 235, 235);
 	z-index: 2;
 }
 
@@ -36,7 +38,7 @@ video {
 	content: '';
 	width: 100%;
 	height: 100%;
-	background-color: rgba(0, 0, 0, 0.5);
+	background-color: rgba(253, 253, 253, 0.5);
 	top: 0;
 	left: 0;
 	z-index: 1;
@@ -57,6 +59,29 @@ video {
 	background: url(https://img.icons8.com/metro/26/000000/close-window.png);
 	text-indent: -9999px;
 }
+.btnplace {
+	position: relative;
+	display: flex;
+	justify-content: center;
+	top: 35vh;
+	margin: auto;
+}
+
+button {
+  padding: 10px;
+  width: 110px;
+  height: 50px;
+  margin: 2px;
+}
+
+.header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px 20px;
+	background-color: #927dfc;
+	z-index: 2;
+}
 
 /*버튼들 위치*/
 .host,
@@ -70,14 +95,138 @@ video {
 #focus {
 	display: none;
 	width: 60%;
+  margin: 0px auto;
 	height: 60%;
 }
-
+.logo {
+	font-size: 30px;
+	font-weight: 900;
+	color: white;
+}
+.ver {
+	font-size: 15px;
+	font-weight: 500;
+	bottom: 0;
+	color: white;
+}
 .voice {
 	display: none;
 }
 
 .timer {
-	position: absolute;
-	top: 280px;
+	position: relative;
+	top: -30px;
+	color: azure;
+	left: 10px;
+}
+.header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px 20px;
+	background-color: #927dfc;
+	z-index: 2;
+	box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.05);
+}
+h1 {
+	color: rgb(250, 250, 250);
+}
+
+.counterplace {
+	position: relative;
+	top: 30px;
+}
+
+.countupbtn {
+	box-shadow: inset 0px 1px 0px 0px #efdcfb;
+	background: linear-gradient(to bottom, #dfbdfa 5%, #bc80ea 100%);
+	background-color: #dfbdfa;
+	border-radius: 6px;
+	border: 1px solid #c584f3;
+	display: inline-block;
+	cursor: pointer;
+	color: #ffffff;
+	font-family: Arial;
+	font-size: 15px;
+	font-weight: bold;
+	padding: 6px 24px;
+	text-decoration: none;
+	text-shadow: 0px 1px 0px #9752cc;
+}
+
+.countdownbtn {
+	box-shadow: inset 0px 1px 0px 0px #f1ebf5;
+	background: linear-gradient(to bottom, #dfbdfa 5%, #bc80ea 100%);
+	background-color: #dfbdfa;
+	border-radius: 6px;
+	border: 1px solid #c584f3;
+	display: inline-block;
+	cursor: pointer;
+	color: #ffffff;
+	font-family: Arial;
+	font-size: 15px;
+	font-weight: bold;
+	padding: 6px 24px;
+	text-decoration: none;
+	text-shadow: 0px 1px 0px #9752cc;
+}
+
+.countresetbtn {
+	box-shadow: inset 0px 1px 0px 0px #efdcfb;
+	background: linear-gradient(to bottom, #dfbdfa 5%, #bc80ea 100%);
+	background-color: #dfbdfa;
+	border-radius: 6px;
+	border: 1px solid #c584f3;
+	display: inline-block;
+	cursor: pointer;
+	color: #ffffff;
+	font-family: Arial;
+	font-size: 15px;
+	font-weight: bold;
+	padding: 6px 24px;
+	text-decoration: none;
+	text-shadow: 0px 1px 0px #9752cc;
+}
+.offClubHouseMode_btn {
+	margin-top: 10px;
+	box-shadow: inset 0px 1px 0px 0px #efdcfb;
+	background: linear-gradient(to bottom, #dfbdfa 5%, #bc80ea 100%);
+	background-color: #dfbdfa;
+	border-radius: 6px;
+	border: 1px solid #c584f3;
+	display: inline-block;
+	cursor: pointer;
+	color: #ffffff;
+	font-family: Arial;
+	font-size: 15px;
+	font-weight: bold;
+	padding: 6px 24px;
+	text-decoration: none;
+	text-shadow: 0px 1px 0px #9752cc;
+}
+.send {
+	box-shadow: inset 0px 1px 0px 0px #efdcfb;
+	background: linear-gradient(to bottom, #dfbdfa 5%, #bc80ea 100%);
+	background-color: #dfbdfa;
+	border-radius: 6px;
+	border: 1px solid #c584f3;
+	display: inline-block;
+	cursor: pointer;
+	color: #ffffff;
+	font-family: Arial;
+	font-size: 15px;
+	font-weight: bold;
+	padding: 6px 24px;
+	text-decoration: none;
+	text-shadow: 0px 1px 0px #9752cc;
+}
+input {
+	margin-left: 10px;
+	margin-top: 10px;
+	margin-bottom: 25px;
+	padding: 10px;
+	border: 3px solid #b7abc0;
+	border-radius: 0px;
+	height: 30px;
+	width: 300px;
 }
