@@ -295,7 +295,7 @@ audio_btn.onclick = () => {
 //button event
 //나가기 버튼
 exit_btn.onclick = () => {
-	window.location.href = 'http://localhost:8081/waittingroom';
+	window.location.href = 'https://192.168.35.115:80/waittingroom';
 };
 
 //타이머
@@ -382,7 +382,7 @@ function becomeHost(userId) {
 
 function beKickedOutByHost(userId) {
 	if (userId === vm.$data.userId) {
-		window.location.href = 'http://192.168.35.115:8081/waittingroom';
+		window.location.href = 'https://192.168.35.115:80/waittingroom';
 	}
 }
 
@@ -544,7 +544,7 @@ function getParameterByName(name) {
 function sendRoomData() {
 	axios
 		.post(
-			`http://localhost:80/changeroominfo`,
+			`https://192.168.35.115:80/changeroominfo`,
 			JSON.stringify(vm.$data.roomInfo),
 			{
 				headers: { 'Content-Type': `application/json` },
@@ -561,26 +561,28 @@ function sendRoomData() {
 
 async function getRoomInfo() {
 	await axios
-		.get(`http://localhost:80/room/${ROOM_ID}`, {
+		.get(`https://192.168.35.115:80/room/${ROOM_ID}`, {
 			headers: { 'Access-Control-Allow-Origin': '*' },
 		})
 		.then(response => {
 			vm.$data.roomInfo = response.data;
 		})
 		.catch(e => {
+			console.log(e);
 			alert('방 정보를 가져오는 중 문제가 발생했습니다.');
 		});
 }
 
 async function getUserInfo() {
 	await axios
-		.get(`http://localhost:80/user/${vm.$data.userEmail}`, {
+		.get(`https://192.168.35.115:80/user/${vm.$data.userEmail}`, {
 			headers: { 'Access-Control-Allow-Origin': '*' },
 		})
 		.then(response => {
 			vm.$data.userInfo = response.data;
 		})
 		.catch(e => {
+			console.log(e);
 			alert('유저 정보를 가져오는 중 문제가 발생했습니다.');
 		});
 }

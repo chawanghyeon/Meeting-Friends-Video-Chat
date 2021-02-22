@@ -8,18 +8,19 @@ const passwordList = {};
 const hostList = {};
 const emailList = {};
 
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(cors());
 
 app.get('/room/:room', (req, res) => {
-	if (req.headers.referer === 'http://localhost:8081/waittingroom') {
+	if (req.headers.referer === 'https://192.168.35.115:80/waittingroom') {
 		res.render('room.ejs', {
 			roomId: req.params.room,
 			test: req,
 		});
 	} else {
-		res.redirect('http://localhost:8081/waittingroom');
+		res.redirect('https://192.168.35.115:80/waittingroom');
 	}
 });
 
@@ -60,7 +61,7 @@ io.on('connection', socket => {
 		//연결이 끊어졌을 때
 		socket.on('disconnect', () => {
 			axios.get(
-				`http://localhost:80/exitroom/room/${roomId}/user/${emailList[userId]}`
+				`https://192.168.35.115:80/exitroom/room/${roomId}/user/${emailList[userId]}`
 			);
 
 			socket.to(roomId).broadcast.emit('user-disconnected', userId);
